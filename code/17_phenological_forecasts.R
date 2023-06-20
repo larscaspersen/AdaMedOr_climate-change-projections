@@ -140,3 +140,4 @@ for (a in cultivars){
   }
 }
 
+save(Results_apricot, file="data/Results_apricot_future.RData")
