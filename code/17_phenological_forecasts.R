@@ -442,6 +442,105 @@ for (a in cultivars){
 save(Results_pear, file="data/Results_pear_future.RData")
 
 
+############################################################
+### Pistachio
+#########################################################
+
+## Load all the fitting results from the 10 repetitions
+fit_list <- list()
+for(i in 1:10){
+  fit_list[[i]] <- load_fitting_result('data/fitting/pistachio/', prefix = paste0('repeat', i, '_'))
+}
+
+cultivars <- names(fit_list[[1]])
+
+Results_pistachio<-data.frame()
+for (a in cultivars){
+  #Filter the locations in which a certain cultivar is present
+  Locations<-filter(filtered, species=="Pistachio" & cultivar==a)%>%
+    pull(4)%>%
+    str_split(., pattern=", ")%>%
+    unlist()
+  # Control for missing locations (names that dont match)
+  if(length(Locations)<1){print(paste("Not matching name for:", a, "!!!!!!"))
+    next}
+  # Loop to determine the scenarios included for that sampling location
+  for(b in Locations){
+    Scenarios<-filter(List_models, Location==b)
+    if(nrow(Scenarios)==0){print(paste("No temperature data for:", a, b))
+      next}
+    SSP<-unique(Scenarios$Scenario)
+    # Loop to determine the models applied to this scenario
+    for(c in SSP){
+      Models<-filter(Scenarios, Scenario==c)
+      
+      Result<-purrr::map(Models$Model, function(d){
+        Code_2050<-filter(Models, Model==d & Year==2050)
+        Code_2085<-filter(Models, Model==d & Year==2085)
+        
+        File_code_2050<-paste0(Code_2050$Code,
+                               "_", 
+                               Code_2050$Location)
+        
+        File_code_2085<-paste0(Code_2085$Code,
+                               "_", 
+                               Code_2085$Location)
+        
+        Meteo_2050<-read.csv(paste0("./data/Future-sim-weather/", 
+                                    files[which(substr(files, 1, nchar(File_code_2050)) == File_code_2050)]), 
+                             fileEncoding = "ISO-8859-1")
+        Meteo_2085<-read.csv(paste0("./data/Future-sim-weather/", 
+                                    files[which(substr(files, 1, nchar(File_code_2085)) == File_code_2085)]), 
+                             fileEncoding = "ISO-8859-1")
+        Latitude<-Lat%>%
+          dplyr::filter(Locations==b)%>%
+          pull(Lat)
+        Meteo_2050<-stack_hourly_temps(Meteo_2050, latitude = Latitude )
+        Meteo_2085<-stack_hourly_temps(Meteo_2085, latitude = Latitude )
+        Meteo_2050<-genSeasonList(Meteo_2050$hourtemps, years=c(2000:2100))
+        Meteo_2085<-genSeasonList(Meteo_2085$hourtemps, years=c(2000:2100))
+        
+        par_list<-purrr::map(fit_list, a)
+        #use fvlaue instead
+        confidence <- purrr::map(fit_list, a) %>% 
+          purrr::map_dbl('fbest')
+        confidence <- 1/confidence
+        
+        out_obs_2050 <- pheno_ensemble_prediction(par_list, confidence, temp = Meteo_2050)
+        
+        out_df_2050 <- data.frame(cultivar = a,
+                                  Location=b,
+                                  Scenario=c,
+                                  Model=d,
+                                  Year=2050,
+                                  predicted = out_obs_2050$predicted,
+                                  sd = out_obs_2050$sd)
+        
+        out_obs_2085 <- pheno_ensemble_prediction(par_list, confidence, temp = Meteo_2085)
+        
+        out_df_2085 <- data.frame(cultivar = a,
+                                  Location=b,
+                                  Scenario=c,
+                                  Model=d,
+                                  Year=2085,
+                                  predicted = out_obs_2085$predicted,
+                                  sd = out_obs_2085$sd)
+        Results<-rbind.data.frame(out_df_2050, out_df_2085)
+        return(Results)
+      }, .progress = TRUE)%>% 
+        bind_rows()
+      Results_pistachio<-rbind(Results_pistachio, Result)
+      print(paste("Completed:", a, b, c))
+    }
+  }
+}
+
+save(Results_pistachio, file="data/Results_pistachio_future.RData")
+
+
+
+
+
 
 ############################################################
 ### European plum // NO DATA
