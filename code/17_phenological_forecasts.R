@@ -83,7 +83,7 @@ for (a in cultivars){
     for(c in SSP){
       Models<-filter(Scenarios, Scenario==c)
       
-      Result<-purrr::map(Models$Model, function(d){
+      Result<-purrr::map(unique(Models$Model), function(d){
         Code_2050<-filter(Models, Model==d & Year==2050)
         Code_2085<-filter(Models, Model==d & Year==2085)
         
@@ -186,7 +186,7 @@ for (a in cultivars){
     for(c in SSP){
       Models<-filter(Scenarios, Scenario==c)
       
-      Result<-purrr::map(Models$Model, function(d){
+      Result<-purrr::map(unique(Models$Model), function(d){
         Code_2050<-filter(Models, Model==d & Year==2050)
         Code_2085<-filter(Models, Model==d & Year==2085)
         
@@ -282,7 +282,7 @@ for (a in cultivars){
     for(c in SSP){
       Models<-filter(Scenarios, Scenario==c)
       
-      Result<-purrr::map(Models$Model, function(d){
+      Result<-purrr::map(unique(Models$Model), function(d){
         Code_2050<-filter(Models, Model==d & Year==2050)
         Code_2085<-filter(Models, Model==d & Year==2085)
         
@@ -378,7 +378,7 @@ for (a in cultivars){
     for(c in SSP){
       Models<-filter(Scenarios, Scenario==c)
       
-      Result<-purrr::map(Models$Model, function(d){
+      Result<-purrr::map(unique(Models$Model), function(d){
         Code_2050<-filter(Models, Model==d & Year==2050)
         Code_2085<-filter(Models, Model==d & Year==2085)
         
@@ -474,7 +474,7 @@ for (a in cultivars){
     for(c in SSP){
       Models<-filter(Scenarios, Scenario==c)
       
-      Result<-purrr::map(Models$Model, function(d){
+      Result<-purrr::map(unique(Models$Model), function(d){
         Code_2050<-filter(Models, Model==d & Year==2050)
         Code_2085<-filter(Models, Model==d & Year==2085)
         
@@ -574,7 +574,7 @@ for (a in cultivars){
     for(c in SSP){
       Models<-filter(Scenarios, Scenario==c)
       
-      Result<-purrr::map(Models$Model, function(d){
+      Result<-purrr::map(unique(Models$Model), function(d){
         Code_2050<-filter(Models, Model==d & Year==2050)
         Code_2085<-filter(Models, Model==d & Year==2085)
         
