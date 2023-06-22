@@ -50,7 +50,7 @@ rm(Results_pistachio)
 Full_fut <- rbind.data.frame(Almond, Apricot, Sweet_cherry, Pear, Pistachio)
 #################################
 
-## Calculates the 
+## Future estimations of flowering dates
 
 Future <- Full_fut %>%
   group_by(Species, cultivar, Location, Scenario, Year, Model) %>%
@@ -72,7 +72,7 @@ Risk <- merge(Future, Changes, by=c("Species", "cultivar", "Location", "Year", "
 
 Risk <- Risk %>%
   mutate(N_miss_FW=(n/Numb), .before="Numb") %>%
-  .[,c(1:9)]
+  .[,c(1:10)]
 
 # I replace those that did not have missing years with 0 risk
 Risk[is.na(Risk$N_miss_FW), "N_miss_FW"]<-0
