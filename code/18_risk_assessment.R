@@ -68,14 +68,22 @@ Changes <- merge(Full_fut, Flowering, by= c("Species", "cultivar", "Location"), 
   group_by(Species, cultivar, Location, Scenario, Year, Model) %>%
   count()
 
+# Clean_data <- merge(Full_fut, Flowering, by= c("Species", "cultivar", "Location"), all.x=TRUE) %>%
+#   mutate(., Dif=abs(predicted-Mean)) %>%
+#   filter(., Dif<=Max_range)
+# 
+# Clean_future <- Clean_data %>%
+#   group_by(Species, cultivar, Location, Scenario, Year, Model) %>%
+#   summarise(Mean_F=mean(predicted, na.rm=TRUE),
+#             SD_F=sd(predicted, na.rm=TRUE),
+#             Numb=n())
+
 Risk <- merge(Future, Changes, by=c("Species", "cultivar", "Location", "Year", "Scenario", "Model"), all.x=TRUE)
 
-Risk <- Risk %>%
-  mutate(N_miss_FW=(n/Numb), .before="Numb") %>%
-  .[,c(1:10)]
+Risk[is.na(Risk$n), "n"]<-0
 
-# I replace those that did not have missing years with 0 risk
-Risk[is.na(Risk$N_miss_FW), "N_miss_FW"]<-0
+Risk <- Risk %>%
+  mutate(N_miss_FW=101-Numb+n, .before="Numb")
 
 
 Risk <- merge(Risk, Flowering, by=c("Species", "cultivar", "Location"), all.x=TRUE) %>%
@@ -133,6 +141,45 @@ Risk$Signif.change <- apply(Risk, 1, function(x){
 })
 
 # save(Risk, file="data/preliminary_risk.RData")
+
+load("data/preliminary_risk.RData")
+
+Risk$Pond_FW_change <- Risk$Fw_change * (Risk$N_miss_FW/101)
+
+Final_risk <- data.frame(
+  Risk[,1:6],
+  FW_change = scales::rescale(Risk$Pond_FW_change),
+  FW_variab = scales::rescale(Risk$SD_change),
+  Sig = ifelse(Risk$Signif.change<=0.05, 1, 0)
+)
+
+Final_risk <- Final_risk %>%
+  mutate(TOTAL=FW_change+ FW_variab)
+
+
+ggplot(filter(Final_risk, Year==2050), aes(y=reorder(cultivar, TOTAL), x=TOTAL, fill=Scenario))+
+  geom_boxplot()+
+  facet_grid(rows=vars(Species), cols = vars(Location), scales = "free")
+  # scale_x_continuous(limits = c(0,3))
+
+jpeg("data/risk_plot_v1_2050.jpeg", width = 10, height = 20, units = "in", res = 300)
+ggplot(filter(Final_risk, Year==2050), aes(y=reorder(cultivar, TOTAL), x=TOTAL, fill=cultivar))+
+  geom_boxplot()+
+  labs(title="2050")+
+  facet_grid(rows=vars(Species), cols = vars(Location), scales = "free")+
+  theme_bw()+
+  theme(legend.position = "none")
+dev.off()
+
+
+jpeg("data/risk_plot_v1_2085.jpeg", width = 10, height = 20, units = "in", res = 300)
+ggplot(filter(Final_risk, Year==2050), aes(y=reorder(cultivar, TOTAL), x=TOTAL, fill=cultivar))+
+  geom_boxplot()+
+  labs(title="2085")+
+  facet_grid(rows=vars(Species), cols = vars(Location), scales = "free")+
+  theme_bw()+
+  theme(legend.position = "none")
+dev.off()
 
 
 ### Debug code, not relevant
