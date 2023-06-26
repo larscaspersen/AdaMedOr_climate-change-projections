@@ -1,7 +1,12 @@
+library(tidyverse)
 
-setwd('../fruittree_portfolio/')
+#setwd('../fruittree_portfolio/')
 #load almond data
 almond_fit1 <- almond_fit2 <- almond_fit3 <- almond_fit <- list()
+
+source('code/utilities/load_save_fitting_results.R')
+
+
 for(i in 1:10){
   
   almond_fit1[[i]] <- load_fitting_result('data/fitting/almond/repeated_fitting_different_bounds/',
