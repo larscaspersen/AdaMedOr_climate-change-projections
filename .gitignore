@@ -6,6 +6,12 @@
 #figures
 figures/
 
+#downloaded cmip6 data raw
+temp_cmip6/
+
+data/future_weather/
+
+
 
 
 
