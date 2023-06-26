@@ -16,6 +16,16 @@ load_fitting_result_single <- function(path){
   pos.cpu_time <- which(x == '$cpu_time')
   pos.Refset <- which(x == '$Refset')
   
+  #also scan the Refset data
+  pos.Refset.x <- which(x == '$Refset$x')
+  pos.Refset.f <- which(x == '$Refset$f')
+  pos.Refset.fpen <- which(x == '$Refset$fpen')
+  pos.Refset.const <- which(x == '$Refset$const')
+  pos.Refset.penalty <- which(x == '$Refset$penalty')
+  
+  
+  
+  
   #data in pos f
   
   extract_res_vector <- function(x, pos.data){
@@ -81,6 +91,12 @@ load_fitting_result_single <- function(path){
   #in case of cpu time, drop first row
   pos.data.cpu_time <- pos.data.cpu_time[-1]
   
+  #position of Refset data
+  pos.data.Refset.x <- (pos.Refset.x + 1):(pos.Refset.f-1)
+  pos.data.Refset.f <- (pos.Refset.f + 1):(pos.Refset.fpen-1)
+  pos.data.Refset.fpen <- (pos.Refset.fpen + 1):(pos.Refset.const-1)
+  pos.data.Refset.const <- (pos.Refset.const + 1):(pos.Refset.penalty-1)
+  pos.data.Refset.penalty <- (pos.Refset.penalty + 1):(length(x))
   
   #bind them together
   return(
@@ -90,7 +106,12 @@ load_fitting_result_single <- function(path){
          'fbest' = extract_res_vector(x, pos.data.fbest),
          'xbest' = extract_res_vector(x, pos.data.xbest),
          'numeval' = extract_res_vector(x, pos.data.numeval),
-         'cpu_time' = extract_res_vector(x, pos.data.cpu_time))
+         'cpu_time' = extract_res_vector(x, pos.data.cpu_time),
+         'Refset' = list('x' = extract_res_x(x, pos.data.Refset.x),
+                         'f' = extract_res_vector(x, pos.data.Refset.f),
+                         'fpen' = extract_res_vector(x, pos.data.Refset.fpen),
+                         'const' = extract_res_vector(x, pos.data.Refset.const),
+                         'penalty' = extract_res_vector(x, pos.data.Refset.penalty)))
   )
 }
 
