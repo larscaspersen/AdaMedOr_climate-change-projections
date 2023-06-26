@@ -16,6 +16,7 @@ stations[which(stations$species=="Pistachio"), "flowering_f50"]<-flowering_pista
 
 stations$flowering_f50 <- yday(as.Date(stations$flowering_f50))
 
+
 Flowering <- stations %>%
   filter(location %in% c("Meknes","Sfax","Zaragoza")) %>%
   group_by(species, cultivar, location) %>%
@@ -173,7 +174,7 @@ dev.off()
 
 
 jpeg("data/risk_plot_v1_2085.jpeg", width = 10, height = 20, units = "in", res = 300)
-ggplot(filter(Final_risk, Year==2050), aes(y=reorder(cultivar, TOTAL), x=TOTAL, fill=cultivar))+
+ggplot(filter(Final_risk, Year==2085), aes(y=reorder(cultivar, TOTAL), x=TOTAL, fill=cultivar))+
   geom_boxplot()+
   labs(title="2085")+
   facet_grid(rows=vars(Species), cols = vars(Location), scales = "free")+

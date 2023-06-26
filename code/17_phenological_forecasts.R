@@ -106,8 +106,8 @@ for (a in cultivars){
           pull(Lat)
         Meteo_2050<-stack_hourly_temps(Meteo_2050, latitude = Latitude )
         Meteo_2085<-stack_hourly_temps(Meteo_2085, latitude = Latitude )
-        Meteo_2050<-genSeasonList(Meteo_2050$hourtemps, years=c(2000:2100))
-        Meteo_2085<-genSeasonList(Meteo_2085$hourtemps, years=c(2000:2100))
+        Meteo_2050<-genSeasonList(Meteo_2050$hourtemps, years=c(2001:2100))
+        Meteo_2085<-genSeasonList(Meteo_2085$hourtemps, years=c(2001:2100))
         
         par_list<-purrr::map(fit_list, a)
         #use fvlaue instead
