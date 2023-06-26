@@ -226,3 +226,45 @@ write.csv(sfax, 'data/sfax-org_1973-2021.csv', row.names = FALSE)
 
 
 
+
+
+
+
+
+
+
+
+
+
+cieza <- read.csv('data/weather_ready/cieza_clean.csv')
+
+stations <- read.csv('data/weather_ready/weather_station_phenological_observations.csv')
+stations <- stations %>% 
+  mutate(id = station_name,
+         Latitude = latitude,
+         Longitude = longitude)
+
+
+loc <- stations %>% 
+  filter(station_name == 'Cieza') %>% 
+  dplyr::select(Latitude, Longitude)
+
+possible_stations <- handle_gsod(action = 'list_stations', location = loc)
+
+#download murcia station
+murcia <- handle_gsod(action = 'download_weather', 
+                      location =  possible_stations$chillR_code[1], 
+                      time_interval = c(1973, 2022),
+                      station_list = possible_stations)
+
+murcia <- handle_gsod(murcia)
+
+cieza_patched <- patch_daily_temperatures(cieza,murcia$MURCIA$weather)
+
+
+write.csv(cieza_patched$weather, file = 'data/weather_ready/cieza_clean_patched.csv', row.names = FALSE)
+
+
+
+
+
