@@ -15,125 +15,50 @@ species <- c('almond', 'apricot', 'european_plum', 'japanese_plum',  'pistachio'
 #number of repititions
 r <- 10
 
-apricot_fit <- apricot_fit2 <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <-  list()
+apricot_fit <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <- almond_fit_old <-  list()
 
 for(i in 1:r){
-  apricot_fit[[i]] <- load_fitting_result('data/fitting/apricot/repeated_fitting/', prefix = paste0('repeat', i, '_'))
-  apricot_fit2[[i]] <- load_fitting_result('data/fitting/apricot/repeated_fitting_with_cieza/', prefix = paste0('repeat', i, '_'))
+  apricot_fit[[i]] <- load_fitting_result('data/fitting/apricot/repeated_fitting_clean/', prefix = paste0('repeat', i, '_'))
   eplum_fit[[i]] <- load_fitting_result('data/fitting/european_plum/', prefix = paste0('repeat', i, '_'))
   jplum_fit[[i]] <- load_fitting_result('data/fitting/japanese_plum/', prefix = paste0('repeat', i, '_'))
   pistachio_fit[[i]] <- load_fitting_result('data/fitting/pistachio/', prefix = paste0('repeat', i, '_'))
   cherry_fit[[i]] <- load_fitting_result('data/fitting/sweet_cherry/repeated_fitting/', prefix = paste0('repeat', i, '_'))
-  almond_fit[[i]] <- load_fitting_result('data/fitting/almond/repeated_fitting/', prefix = paste0('repeat', i, '_'))
+  almond_fit_old[[i]]  <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting/', prefix = paste0('repeat', i, '_'))
+  almond_fit[[i]] <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting_new_bounds', prefix = paste0('repeat', i, '_'))
   pear_fit[[i]] <- load_fitting_result('data/fitting/pear/', prefix = paste0('repeat', i, '_'))
 }
 
   
-names(apricot_fit2[[1]])
-#add the cultivars which are not in apricot fit2 from apricot fit
-apricot_zaragoza_only  <- names(apricot_fit[[1]])[!names(apricot_fit[[1]]) %in% names(apricot_fit2[[1]])]
 
-#add cultivars which I had not to refit
-for(i in 1:r){
-  for(cult in apricot_zaragoza_only){
-    apricot_fit2[[i]][[cult]] <- apricot_fit[[i]][[cult]]
-  }
-
-}
-
-
-fit_list <- list('Apricot' = apricot_fit2,
+fit_list <- list('Apricot' = apricot_fit,
                  'European Plum' = eplum_fit,
                  'Japanese Plum' = jplum_fit,
                  'Pistachio' = pistachio_fit,
                  'Sweet Cherry' = cherry_fit,
-                 'Almond' = almond_fit,
+                 'Almond' = almond_fit_old,
                  'Pear' = pear_fit)
 
 
-#need to load and recreate all the splits I did in the other scripts, because I forgot to save it
-
-
-# #need zaragoza and klein altendorf
-# cka <- read.csv('data/weather_ready/temp_cka_1958-2022.csv')
-# zaragoza <- read.csv('data/weather_raw/temp_zgz_1973-2022.csv')
-# sfax <- read.csv('data/weather_ready/sfax_1973-2021_fixed.csv')
-# cieza <- readxl::read_xlsx('data/weather_raw/Cieza(95_22)Tmax&Tmin.xlsx')
-# meknes <- read.csv('data/weather_ready/meknes-bassatine-fixed_1973-2022.csv')
-# 
-# #cieza needs to be modified a bit
-# cieza <- cieza %>%
-#   dplyr::select(-Hours) %>%
-#   mutate(Month = lubridate::month(Date),
-#          Day = lubridate::day(Date))
-# 
-# 
-# str(cka)
-# str(zaragoza)
-# str(sfax)
-# str(cieza)
-# str(meknes)
-# 
-# #bring it to the same format
-# 
-# cka_clean <- cka %>%
-#   mutate(Date = lubridate::ymd(DATE)) %>%
-#   dplyr::select(Date, Year, Month, Day, Tmin, Tmax)
-# 
-# zaragoza_clean <- zaragoza %>%
-#   mutate(Date = lubridate::ymd(paste0(Year, '-', Month, '-', Day))) %>%
-#   dplyr::select(Date, Year, Month, Day, Tmin, Tmax)
-# 
-# sfax_clean <- sfax %>%
-#   mutate(Date = lubridate::ymd_hms(DATE)) %>%
-#   mutate(Date = as.Date.character(Date)) %>%
-#   dplyr::select(Date, Year, Month, Day, Tmin, Tmax)
-# 
-# cieza_clean <- cieza %>%
-#   mutate(Date = as.Date(Date) ) %>%
-#   dplyr::select(Date, Year, Month, Day, Tmin, Tmax)
-# 
-# meknes_clean <- meknes %>%
-#   mutate(Date = as.Date(DATE)) %>%
-#   dplyr::select(Date, Year, Month, Day, Tmin, Tmax)
-# 
-# 
-# write.csv(sfax_clean, 'data/weather_ready/sfax_clean.csv', row.names = FALSE)
-# write.csv(zaragoza_clean, 'data/weather_ready/zaragoza_clean.csv', row.names = FALSE)
-# write.csv(cka_clean, 'data/weather_ready/cka_clean.csv', row.names = FALSE)
-# write.csv(cieza_clean, 'data/weather_ready/cieza_clean.csv', row.names = FALSE)
-# write.csv(meknes_clean, 'data/weather_ready/meknes_clean.csv', row.names = FALSE)
-# 
-# #make hourly
-# coord_zaragoza <- c(41.65, -0.88)
-# coord_cka <- c(50.61, 6.99)
-# coord_sfax <-c(34.75, 10.75)
-# coord_cieza <-c(38.24, -1.41)
-# coord_meknes <- c(33.88, -5.54)
-# 
-# 
-# stations_pheno_observations <- data.frame(station_name = c('Zaragoza', 'Klein-Altendorf', 'Sfax', 'Cieza', 'Meknes'),
-#            country = c('Spain', 'Germany', 'Tunisia', 'Spain', 'Morocco'),
-#            latitude = c(coord_zaragoza[1], coord_cka[1], coord_sfax[1], coord_cieza[1], coord_meknes[1]),
-#            longitude = c(coord_zaragoza[2], coord_cka[2], coord_sfax[2], coord_cieza[2], coord_meknes[2]))
-# 
-# write.csv(stations_pheno_observations, 'data/weather_ready/weather_station_phenological_observations.csv', row.names = FALSE)
+######################################
+#read weather data, create season list
+######################################
 
 cka <- read.csv('data/weather_ready/cka_clean.csv')
 zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv')
 sfax <- read.csv('data/weather_ready/sfax_clean.csv')
 meknes <- read.csv('data/weather_ready/meknes_clean.csv')
-cieza <- read.csv('data/weather_ready/cieza_clean.csv')
+cieza <- read.csv('data/weather_ready/cieza_clean_patched.csv')
 
 weather_stations <- read.csv('data/weather_ready/weather_station_phenological_observations.csv')
 
 
-
+#make hourly
 cka_hourly <- stack_hourly_temps(cka, latitude = weather_stations$latitude[weather_stations$station_name == 'Klein-Altendorf'])
 zaragoza_hourly <- stack_hourly_temps(zaragoza, latitude =  weather_stations$latitude[weather_stations$station_name == 'Zaragoza'])
 sfax_hourly <- stack_hourly_temps(sfax, latitude =  weather_stations$latitude[weather_stations$station_name == 'Sfax'])
 cieza_hourly <- stack_hourly_temps(cieza, latitude =  weather_stations$latitude[weather_stations$station_name == 'Cieza'])
 meknes_hourly <- stack_hourly_temps(meknes, latitude =  weather_stations$latitude[weather_stations$station_name == 'Meknes'])
+
 
 cka_hourly <- cka_hourly$hourtemps
 zaragoza_hourly <- zaragoza_hourly$hourtemps
@@ -183,7 +108,7 @@ sub <- NULL
 prediction_df <- data.frame()
 
 
-
+#generate predictions
 for(spec in names(fit_list)){
   for(i in 1:r){
     
@@ -219,6 +144,8 @@ for(spec in names(fit_list)){
     }
   }
 }
+
+prediction_df$residual <- prediction_df$pred - prediction_df$pheno
 #maybe different order of data??
 
 #add iqr to prediction data.frame
@@ -234,6 +161,10 @@ performance <- prediction_df %>%
   dplyr::summarise(rmse = RMSEP(predicted = pred, observed = pheno),
             mean_bias = mean(pred - pheno)) %>% 
   mutate(rpiq_adj = iqr / rmse)
+
+#save predictions and performance 
+write.csv(prediction_df, file = 'data/predicted_flowering_vs_observed.csv', row.names = FALSE)
+write.csv(performance, file = 'data/performance_fitted_models.csv', row.names = FALSE)
 
 
 performance %>% 
@@ -680,3 +611,92 @@ par_df %>%
 
 
 #run again with staring points and adjusted search space
+
+
+
+
+
+almond_fit_list <- list('Almond old' = almond_fit_old,
+                        'Almond new bound' = almond_fit)
+
+almond_prediction_df <- data.frame()
+for(spec in names(almond_fit_list)){
+  for(i in 1:r){
+    
+    cultivars <- names(almond_fit_list[[spec]][[i]])
+    for(cult in cultivars){
+      
+      
+      
+      #extract parameters
+      par <- almond_fit_list[[spec]][[i]][[cult]]$xbest 
+      #add fixed parameters
+      par <- c(par[1:4], theta_star, par[5:8], Tc, par[9:10])
+      
+      #subset master file
+      sub <- master_pheno_split %>% 
+        filter(species == 'Almond',
+               cultivar == cult,
+               repetition == i)
+      
+      #generate seasonlist
+      sub_SeasonList <-  purrr::map2(sub$location, sub$year, function(loc, yr) SeasonList[[loc]][[as.character(yr)]])
+      
+      #predict bloom days
+      sub$pred <- return_predicted_days(convert_parameters(par), 
+                                        modelfn = custom_PhenoFlex_GDHwrapper, 
+                                        SeasonList =sub_SeasonList)
+      
+      sub$version <- spec
+      
+      almond_prediction_df <- rbind.data.frame(almond_prediction_df,
+                                        sub)
+      
+      
+      
+    }
+  }
+}
+
+almond_prediction_df$residual <- almond_prediction_df$pred - almond_prediction_df$pheno
+
+
+almond_iqr_df <- almond_prediction_df %>% 
+  group_by(version, cultivar, repetition) %>% 
+  summarise(iqr = IQR(pheno))
+
+
+#now I can generate performance data
+almond_performance <- almond_prediction_df %>% 
+  merge.data.frame(almond_iqr_df, by = c('version', 'cultivar', 'repetition')) %>% 
+  dplyr::group_by(version, cultivar, repetition, split, iqr) %>% 
+  dplyr::summarise(rmse = RMSEP(predicted = pred, observed = pheno),
+                   mean_bias = mean(pred - pheno)) %>% 
+  mutate(rpiq_adj = iqr / rmse)
+
+
+almond_performance %>% 
+  ggplot(aes(y = cultivar, fill = version, x = rpiq_adj)) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  geom_boxplot() +
+  theme_bw() +
+  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  #coord_cartesian(xlim = c(0, 10)) +
+  geom_vline(xintercept = 1, linetype = 'dashed') +
+  theme_bw(base_size = 15) +
+  scale_y_discrete(limits=rev) +
+  facet_grid(~split)
+
+almond_performance %>% 
+  ggplot(aes(y = cultivar, fill = version, x = rmse)) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  geom_boxplot() +
+  theme_bw() +
+  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  #coord_cartesian(xlim = c(0, 10)) +
+  geom_vline(xintercept = 5, linetype = 'dashed') +
+  theme_bw(base_size = 15) +
+  scale_y_discrete(limits=rev) +
+  facet_grid(~split)
+
+'NO IMPROVEMENT AT ALL'
