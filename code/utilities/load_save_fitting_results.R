@@ -83,6 +83,10 @@ load_fitting_result_single <- function(path){
   #get the lines which belong to the different items
   pos.data.f <- (pos.f + 1):(pos.x-1)
   pos.data.x <- (pos.x+1):(pos.time-1)
+  pos.data.time <- (pos.time+1):(pos.neval-1)
+  #the first and every second roq is "elapsed", skip those
+  pos.data.time <- pos.data.time[seq(2,length(pos.data.time), by = 2)]
+  
   pos.data.neval <- (pos.neval+1):(pos.fbest-1)
   pos.data.fbest <- (pos.fbest+1):(pos.xbest-1)
   pos.data.xbest <- (pos.xbest+1):(pos.numeval-1)
@@ -90,6 +94,7 @@ load_fitting_result_single <- function(path){
   pos.data.cpu_time <- (pos.cpu_time+1):(pos.Refset-1)
   #in case of cpu time, drop first row
   pos.data.cpu_time <- pos.data.cpu_time[-1]
+  pos.data.end_crit <- (pos_end_crit+1):(pos.cpu_time-1)
   
   #position of Refset data
   pos.data.Refset.x <- (pos.Refset.x + 1):(pos.Refset.f-1)
@@ -98,15 +103,24 @@ load_fitting_result_single <- function(path){
   pos.data.Refset.const <- (pos.Refset.const + 1):(pos.Refset.penalty-1)
   pos.data.Refset.penalty <- (pos.Refset.penalty + 1):(length(x))
   
+  #time data was named, so read and set name per value
+  data.time <- extract_res_vector(x, pos.data.time)
+  names(data.time) <- rep('elapsed', length(data.time))
+  
+  data.cpu.time <- extract_res_vector(x, pos.data.cpu_time)
+  names(data.cpu.time) <- rep('elapsed', length(data.cpu.time))
+  
   #bind them together
   return(
     list('f' = extract_res_vector(x, pos.data.f),
          'x' = extract_res_x(x, pos.data.x),
+         'time' = data.time,
          'neval' = extract_res_vector(x, pos.data.neval),
          'fbest' = extract_res_vector(x, pos.data.fbest),
          'xbest' = extract_res_vector(x, pos.data.xbest),
          'numeval' = extract_res_vector(x, pos.data.numeval),
-         'cpu_time' = extract_res_vector(x, pos.data.cpu_time),
+         'end_crit' = extract_res_vector(x, pos.data.end_crit),
+         'cpu_time' = data.cpu.time,
          'Refset' = list('x' = extract_res_x(x, pos.data.Refset.x),
                          'f' = extract_res_vector(x, pos.data.Refset.f),
                          'fpen' = extract_res_vector(x, pos.data.Refset.fpen),
@@ -134,7 +148,7 @@ load_fitting_result <- function(path, prefix){
     substr(x, nchar(num) + 2, nchar(x) - 4)
   })
   output <- list()
-  for (i in 1:length(ordered_scenarios)) output[[i]] <- load_fitting_result_single(file.path(path, 
+  for (i in 1:length(ordered_scenarios)) output[[i]] <- load_fitting_result_single(path = file.path(path, 
                                                                                              ordered_scenarios[[i]]))
   names(output) <- scennames
   return(output)
