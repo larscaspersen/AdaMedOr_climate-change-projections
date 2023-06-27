@@ -119,6 +119,14 @@ $x
 [111,]  0.9838747  22.782780 286.6050000 37.530780  24.014090  6.596396  2.077695 17.663497 157.972700
  [ reached getOption("max.print") -- omitted 10 rows ]
 
+$time
+elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed 
+   1.80    4.84    7.58   10.86   15.83   18.37   20.86   26.69   29.12   32.41   34.98   37.55   48.06   52.91   58.47   61.01   63.53   65.09  130.45  131.87  135.11  137.78  151.69  156.87  160.86 
+elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed 
+ 190.78  192.42  229.45  230.75  238.58  253.08  255.73  262.97  265.67  268.36  274.11  279.22  284.25  291.37  293.91  303.91  312.19  314.66  341.72  450.61  474.44  481.22  493.25  505.34  508.16 
+elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed 
+ 510.75  512.09  517.76  521.17  523.84  526.62  529.30  532.06  543.17  603.76 
+
 $neval
  [1]   106   266   424   570   854   998  1139  1425  1564  1710  1853  1999  2553  2824  3096  3233  3372  3462  6754  6832  6966  7103  7780  8050  8267  9620  9711 11482 11555 11965 12644 12781
 [33] 13122 13264 13402 13674 13947 14224 14574 14713 15265 15685 15821 17234 22786 23925 24270 24813 25354 25492 25627 25701 25972 26107 26243 26379 26513 26650 27136 30003
@@ -132,8 +140,12 @@ $xbest
 $numeval
 [1] 30003
 
+$end_crit
+[1] 1
+
 $cpu_time
-[1] 603.76
+elapsed 
+ 603.76 
 
 $Refset
 $Refset$x

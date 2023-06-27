@@ -56,6 +56,10 @@ $x
 [50,] 378.649000   0.3926092 20.1040900 286.697200  45.957510 24.407070  7.958258  4.739237 11.453940
 [51,] 388.898800   0.3669626 20.0758500 286.692200  46.294880 24.434390  7.975414  4.715708 11.453940
 
+$time
+elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed elapsed 
+   1.73    4.50    7.15   13.15   15.87   18.56   29.04   36.45   57.03   64.15   78.82   90.90  131.09  132.43  137.75  155.84  163.06  165.67  168.14  188.23  476.84  478.48  547.14  548.54  584.93 
+
 $neval
  [1]   106   262   407   686   830   972  1530  1924  3000  3349  4155  4790  6834  6907  7185  8140  8486  8622  8757  9813 24562 24650 28203 28276 30043
 
@@ -68,8 +72,12 @@ $xbest
 $numeval
 [1] 30043
 
+$end_crit
+[1] 1
+
 $cpu_time
-[1] 584.93
+elapsed 
+ 584.93 
 
 $Refset
 $Refset$x
