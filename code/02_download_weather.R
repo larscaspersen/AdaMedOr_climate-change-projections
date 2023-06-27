@@ -268,3 +268,75 @@ write.csv(cieza_patched$weather, file = 'data/weather_ready/cieza_clean_patched.
 
 
 
+
+#need to load and recreate all the splits I did in the other scripts, because I forgot to save it
+
+
+# #need zaragoza and klein altendorf
+# cka <- read.csv('data/weather_ready/temp_cka_1958-2022.csv')
+# zaragoza <- read.csv('data/weather_raw/temp_zgz_1973-2022.csv')
+# sfax <- read.csv('data/weather_ready/sfax_1973-2021_fixed.csv')
+# cieza <- readxl::read_xlsx('data/weather_raw/Cieza(95_22)Tmax&Tmin.xlsx')
+# meknes <- read.csv('data/weather_ready/meknes-bassatine-fixed_1973-2022.csv')
+# 
+# #cieza needs to be modified a bit
+# cieza <- cieza %>%
+#   dplyr::select(-Hours) %>%
+#   mutate(Month = lubridate::month(Date),
+#          Day = lubridate::day(Date))
+# 
+# 
+# str(cka)
+# str(zaragoza)
+# str(sfax)
+# str(cieza)
+# str(meknes)
+# 
+# #bring it to the same format
+# 
+# cka_clean <- cka %>%
+#   mutate(Date = lubridate::ymd(DATE)) %>%
+#   dplyr::select(Date, Year, Month, Day, Tmin, Tmax)
+# 
+# zaragoza_clean <- zaragoza %>%
+#   mutate(Date = lubridate::ymd(paste0(Year, '-', Month, '-', Day))) %>%
+#   dplyr::select(Date, Year, Month, Day, Tmin, Tmax)
+# 
+# sfax_clean <- sfax %>%
+#   mutate(Date = lubridate::ymd_hms(DATE)) %>%
+#   mutate(Date = as.Date.character(Date)) %>%
+#   dplyr::select(Date, Year, Month, Day, Tmin, Tmax)
+# 
+# cieza_clean <- cieza %>%
+#   mutate(Date = as.Date(Date) ) %>%
+#   dplyr::select(Date, Year, Month, Day, Tmin, Tmax)
+# 
+# meknes_clean <- meknes %>%
+#   mutate(Date = as.Date(DATE)) %>%
+#   dplyr::select(Date, Year, Month, Day, Tmin, Tmax)
+# 
+# 
+# write.csv(sfax_clean, 'data/weather_ready/sfax_clean.csv', row.names = FALSE)
+# write.csv(zaragoza_clean, 'data/weather_ready/zaragoza_clean.csv', row.names = FALSE)
+# write.csv(cka_clean, 'data/weather_ready/cka_clean.csv', row.names = FALSE)
+# write.csv(cieza_clean, 'data/weather_ready/cieza_clean.csv', row.names = FALSE)
+# write.csv(meknes_clean, 'data/weather_ready/meknes_clean.csv', row.names = FALSE)
+# 
+# #make hourly
+# coord_zaragoza <- c(41.65, -0.88)
+# coord_cka <- c(50.61, 6.99)
+# coord_sfax <-c(34.75, 10.75)
+# coord_cieza <-c(38.24, -1.41)
+# coord_meknes <- c(33.88, -5.54)
+# 
+# 
+# stations_pheno_observations <- data.frame(station_name = c('Zaragoza', 'Klein-Altendorf', 'Sfax', 'Cieza', 'Meknes'),
+#            country = c('Spain', 'Germany', 'Tunisia', 'Spain', 'Morocco'),
+#            latitude = c(coord_zaragoza[1], coord_cka[1], coord_sfax[1], coord_cieza[1], coord_meknes[1]),
+#            longitude = c(coord_zaragoza[2], coord_cka[2], coord_sfax[2], coord_cieza[2], coord_meknes[2]))
+# 
+# write.csv(stations_pheno_observations, 'data/weather_ready/weather_station_phenological_observations.csv', row.names = FALSE)
+
+
+
+
