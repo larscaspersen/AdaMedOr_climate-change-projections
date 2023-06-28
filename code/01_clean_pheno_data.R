@@ -74,6 +74,27 @@ adamedor$country <- ifelse(adamedor$location %in% c('Meknes', 'Tassaout', 'Kheni
 adamedor$country <- ifelse(adamedor$location %in% c('Klein-Altendorf'), yes = 'Germany', 
                            no = adamedor$country)
 
-library(tidyverse)
+
+
+
+adamedor_old <- read.csv('data/combined_phenological_data_adamedor.csv', 
+                         colClasses="character",na.strings="?")
+
+adamedor_transformed <- adamedor_old %>% 
+  filter(species == 'Pistachio') %>% 
+  mutate(begin_flowering_f5 = lubridate::dmy(begin_flowering_f5),
+         flowering_f50 = lubridate::dmy(flowering_f50),
+         flowering_f90 = lubridate::dmy(flowering_f90))
+
+#only contains data from sfax
+adamedor_transformed <- adamedor_transformed %>% 
+  mutate(location = 'Sfax',
+         country = 'Tunisia')
+
+
+#kick out pistachio data from adamedor and replace with adamedor transformed
+adamedor <- adamedor %>% 
+  filter(species != 'Pistachio') %>% 
+  rbind.data.frame(adamedor_transformed)
 
 write.csv(adamedor, 'data/combined_phenological_data_adamedor_clean.csv', row.names = FALSE)
