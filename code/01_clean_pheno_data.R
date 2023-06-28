@@ -89,12 +89,21 @@ adamedor_transformed <- adamedor_old %>%
 #only contains data from sfax
 adamedor_transformed <- adamedor_transformed %>% 
   mutate(location = 'Sfax',
-         country = 'Tunisia')
+         country = 'Tunisia',
+         begin_flowering_f5 = as.Date(begin_flowering_f5, format = '%Y-%m-%d'),
+         flowering_f50 = as.Date(flowering_f50, format = '%Y-%m-%d'),
+         flowering_f90 = as.Date(flowering_f90, format = '%Y-%m-%d'))
 
 
 #kick out pistachio data from adamedor and replace with adamedor transformed
-adamedor <- adamedor %>% 
+adamedor_test <- adamedor %>% 
   filter(species != 'Pistachio') %>% 
+  mutate(begin_flowering_f5 = lubridate::ymd(begin_flowering_f5),
+         flowering_f50 = lubridate::ymd(flowering_f50),
+         flowering_f90 = lubridate::ymd(flowering_f90)) %>% 
   rbind.data.frame(adamedor_transformed)
+
+
+
 
 write.csv(adamedor, 'data/combined_phenological_data_adamedor_clean.csv', row.names = FALSE)
