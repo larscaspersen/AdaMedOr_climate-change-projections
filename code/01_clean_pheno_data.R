@@ -106,4 +106,4 @@ adamedor_test <- adamedor %>%
 
 
 
-write.csv(adamedor, 'data/combined_phenological_data_adamedor_clean.csv', row.names = FALSE)
+write.csv(adamedor_test, 'data/combined_phenological_data_adamedor_clean.csv', row.names = FALSE)
