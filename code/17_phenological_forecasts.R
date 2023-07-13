@@ -1,8 +1,8 @@
 library(tidyverse)
 library(ggplot2)
-library(readr)
+#library(readr)
 library(chillR)
-library(devtools)
+#library(devtools)
 # install_github("larscaspersen/addition_chillR")
 library(LarsChill)
 
@@ -175,8 +175,8 @@ all_predictions <- purrr::map(1:length(future_weather_list), function(i){
 all_predictions_df <- all_predictions %>% 
   bind_rows()
 
-write.csv(all_predictions_df, 'data/projected_bloomdates_ensemble.csv', row.names = FALSE)
-
+#write.csv(all_predictions_df, 'data/projected_bloomdates_ensemble.csv', row.names = FALSE)
+all_predictions_df <- read.csv('data/projected_bloomdates_ensemble.csv')
 
 
 
@@ -201,7 +201,11 @@ flower_summarized <- adamedor %>%
   mutate(value = replace(value, value %in% c(NaN, NA, -Inf), NA)) %>% 
   separate(col = variable, into = c('variable', 'flowering_type'), sep = '\\.') %>% 
   reshape2::dcast(species + location + flowering_type ~ variable, value.var = 'value') %>% 
-  relocate(species, location, flowering_type, mean, sd, max_dist)
+  relocate(species, location, flowering_type, mean, sd, max_dist) %>% 
+  mutate(location = as.factor(location),
+         species = recode(species, 
+                          `European plum` = "European Plum", 
+                          `Japanese plum` = "Japanese Plum") )
 
 adamedor %>% 
   filter(species %in% c('Apricot', 'Pear', 'Sweet Cherry', 'Almond', 'European plum', 'Japanese plum', 'Pistachio'),
@@ -217,9 +221,7 @@ adamedor %>%
 #add the acceptable time window on that location
 flower_summarized <- flower_summarized %>% 
   mutate(upper = mean + max_dist,
-         lower = mean - max_dist) %>% 
-  #mutate(lower = ifelse(lower < 0, yes = 365 + lower, no = lower))
-  mutate(lower = ifelse(lower < 0, yes = 0, no = lower))
+         lower = mean - max_dist)
 
 
 adamedor %>% 
@@ -238,18 +240,6 @@ adamedor %>%
                      labels=c('Cieza', 'Klein-Altendorf', 'Meknes', 'Sfax', 'Zaragoza'))+
   facet_grid(species~flowering_type)
 #--> we need a window for each location and each species....
-
-head(all_predictions_df)
-
-all_predictions_df %>% 
-  separate(col = species_cultivar, into = c('species', 'cultivar'), sep = '_') %>% 
-  filter(species == 'Apricot') %>% 
-  ggplot(aes(x = location, y = pheno_predicted, fill = cultivar)) +
-  geom_boxplot() +
-  facet_grid(ssp~scenario_year)
-
-
-
 
 
 #read historic weather generator data+
@@ -282,7 +272,9 @@ hist_all_predictions <- purrr::map(1:length(hist_gen_weather), function(i){
   mutate(flowering_type = ifelse(species %in% c('Sweet Cherry', 'Pistachio', 'Pear', 'Apricot'), yes = 'flowering_f50', no = 'begin_flowering_f5'))
   
 
-write.csv(hist_all_predictions, 'data/projected_bloomdates_ensemble_historic_scenarios.csv', row.names = FALSE)
+#write.csv(hist_all_predictions, 'data/projected_bloomdates_ensemble_historic_scenarios.csv', row.names = FALSE)
+hist_all_predictions <- read.csv('data/projected_bloomdates_ensemble_historic_scenarios.csv')
+
 #need to indicate if the modelled phenology is f5 or f50
 #cherry flowering_f50
 #almond begin_flowering_f5
@@ -356,17 +348,9 @@ obs_all_predictions <- purrr::map(1:length(SeasonList), function(i){
   mutate(flowering_type = ifelse(species %in% c('Sweet Cherry', 'Pistachio', 'Pear', 'Apricot'), yes = 'flowering_f50', no = 'begin_flowering_f5'))
 
 
-write.csv(x = obs_all_predictions, file = 'data/projected_bloomdates_ensemble_observed_weather.csv', row.names = FALSE)
+#write.csv(x = obs_all_predictions, file = 'data/projected_bloomdates_ensemble_observed_weather.csv', row.names = FALSE)
+obs_all_predictions <- read.csv('data/projected_bloomdates_ensemble_observed_weather.csv')
 
-head(hist_all_predictions)
-
-hist_all_predictions %>% 
-  filter(species == 'Apricot') %>% 
-  ggplot(aes(x = location, y = pheno_predicted, fill = cultivar)) +
-  geom_boxplot() +
-  facet_grid(ssp~scenario_year)
-
-unique(hist_all_predictions$species)
 
 adamedor %>% 
   filter(species %in% c('Apricot', 'Pear', 'Sweet Cherry', 'Almond', 'European plum', 'Japanese plum', 'Pistachio'),
@@ -380,18 +364,144 @@ adamedor %>%
          species = recode(species, 
                           `European plum` = "European Plum", 
                           `Japanese plum` = "Japanese Plum") ) %>% 
-  ggplot(aes(x = as.numeric(location), y = value, group = location, fill = )) +
-  geom_rect(aes(ymin = lower, ymax = upper, xmin = as.numeric(location) - 0.1, xmax = as.numeric(location) + 0.1)) +
-  geom_boxplot(width = 0.2) +
-  geom_boxplot(data = hist_all_predictions, aes(x = as.numeric(as.factor(location)), y = pheno_predicted, group = location), 
-               fill = 'pink', width = 0.2, position= position_nudge(x=-.25)) +
-  geom_boxplot(data = obs_all_predictions, aes(x = as.numeric(as.factor(location)), y = pheno_predicted, group = location), 
-               fill = 'lightblue', width = 0.2, position= position_nudge(x=+.25)) +
+  filter((species %in% c('Sweet Cherry', 'Pistachio', 'Pear', 'Apricot') & flowering_type == 'flowering_f50') |
+         (species %in% c('Almond', 'European Plum', 'Japanese Plum') & flowering_type == 'begin_flowering_f5')) %>% 
+  ggplot(aes(x = as.numeric(location), y = value, group = location, fill = 'calculated time window')) +
+  geom_rect(aes(ymin = lower, ymax = upper, xmin = as.numeric(location) - 0.1, xmax = as.numeric(location) + 0.1),
+            position= position_nudge(x=-.25)) +
+  geom_boxplot(width = 0.2, aes(fill = 'observed flowering'), position= position_nudge(x=-.25)) +
+  geom_boxplot(data = obs_all_predictions, aes(x = as.numeric(as.factor(location)), y = pheno_predicted, group = location,
+                                               fill = 'prediction obs weather'), 
+               width = 0.2) +
+  geom_boxplot(data = hist_all_predictions, aes(x = as.numeric(as.factor(location)), y = pheno_predicted, group = location,
+                                                fill = 'historic simulation'), 
+               width = 0.2, position= position_nudge(x=+.25)) +
   scale_x_continuous(breaks=c(1:5),
-                     labels=c('Cieza', 'Klein-Altendorf', 'Meknes', 'Sfax', 'Zaragoza'))+
-  facet_grid(species~flowering_type)
+                     labels=c('Cieza', 'CKA', 'Meknes', 'Sfax', 'Zaragoza'))+
+  scale_fill_manual(breaks = c('observed flowering', 'calculated time window', 'prediction obs weather', 'historic simulation'),
+                    values = c('lightgreen', 'lightgrey', 'lightblue', 'lightsalmon')) +
+  facet_wrap(~species) +
+  theme_bw(base_size = 15)
 
 
+#vielleicht sollte ich mal pro kutlivar / spezies gucken wie es aussieht
+adamedor_reorg <- adamedor %>% 
+  filter(species %in% c('Apricot', 'Pear', 'Sweet Cherry', 'Almond', 'European plum', 'Japanese plum', 'Pistachio'),
+         location %in% c('Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf', 'Sfax')) %>% 
+  dplyr::select(species, cultivar, location, year, begin_flowering_f5, flowering_f50) %>% 
+  mutate(begin_flowering_f5 = lubridate::yday(begin_flowering_f5), 
+         flowering_f50 = lubridate::yday(flowering_f50)) %>% 
+  reshape2::melt(id.var = c('species', 'cultivar', 'location', 'year'), variable.name = 'flowering_type') %>% 
+  mutate(location = as.factor(location),
+         species = recode(species, 
+                          `European plum` = "European Plum", 
+                          `Japanese plum` = "Japanese Plum") ) %>% 
+  filter((species %in% c('Sweet Cherry', 'Pistachio', 'Pear', 'Apricot') & flowering_type == 'flowering_f50') |
+           (species %in% c('Almond', 'European Plum', 'Japanese Plum') & flowering_type == 'begin_flowering_f5'))
+
+
+
+
+flower_summarized <- flower_summarized %>% 
+  dplyr::filter(location %in% c('Sfax', 'Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf'),
+                !(species %in% c('Peach', 'Olive'))) %>% 
+  na.omit()
+
+
+
+
+
+
+
+
+
+
+
+
+
+#use first degree relationship to infer on possible values 
+#--> this will create multiple possible values 
+
+#
+
+
+
+
+
+
+
+
+
+
+
+t[1, comb[,1]] - t[1, comb[,2]]
+
+combn(t[1,-1], 2) %>% 
+  t() %>% 
+  as.data.frame()   %>% 
+  mutate(V1 = as.numeric(V1),
+         V2 = as.numeric(V2),
+         diff = ifelse(is.na(V1) | is.na(V2), yes = NA, no = V1 - V2))
+
+
+
+
+obs_pred <- obs_all_predictions %>% 
+  mutate(pheno = pheno_predicted) %>% 
+  dplyr::select(year, species, cultivar, pheno, location, gcm, ssp, flowering_type)
+
+hist_pred <- hist_all_predictions %>% 
+  mutate(pheno = pheno_predicted,
+         gcm = 'hist simulation',
+         ssp = 'hist simulation') %>% 
+  dplyr::select(year, species, cultivar, pheno, location, gcm, ssp, flowering_type)
+  
+  
+t <- adamedor_reorg %>%   
+  mutate(gcm = 'observed flowering',
+         ssp = 'observed flowering',
+         pheno = value) %>% 
+  dplyr::select(year, species, cultivar, pheno, location, gcm, ssp, flowering_type) %>% 
+  rbind.data.frame(obs_pred) %>% 
+  rbind.data.frame(hist_pred) %>% 
+  merge.data.frame(flower_summarized, by = c('species', 'location', 'flowering_type'), all.x = TRUE) %>%
+  filter((species %in% c('Sweet Cherry', 'Pistachio', 'Pear', 'Apricot') & flowering_type == 'flowering_f50') |
+           (species %in% c('Almond', 'European Plum', 'Japanese Plum') & flowering_type == 'begin_flowering_f5')) %>% 
+  mutate(location = factor(location, 
+                           levels = c('Sfax', 'Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf'), 
+                           labels = c('Sfax', 'Meknes', 'Cieza', 'Zaragoza', 'CKA')),
+         gcm = factor(gcm, 
+                        levels = c('observed flowering', 'calculated time window', 'observed weather', 'hist simulation'),
+                        labels = c('observed flowering', 'empirical time window', 'modelled: obs weather', 'modelled: hist sim weather')))
+
+t %>% 
+  mutate(species = factor(species, 
+                          levels = c('Almond', 'Apricot', 'European Plum', 'Japanese Plum', 'Pear', 'Pistachio', 'Sweet Cherry'),
+                          labels = c('Almond', 'Apricot', 'Eu. Plum', 'Jp. Plum', 'Pear', 'Pistachio', 'Sw. Cherry'))) %>% 
+  ggplot(aes(x = 1, fill = gcm) ) +
+  geom_rect(aes(ymin = lower, ymax = upper, xmin = 1 - 0.37, xmax = 1 - 0.125,
+                fill = 'empirical time window')) +
+  geom_boxplot(aes(y = pheno, fill = gcm)) +
+  scale_fill_manual(breaks = c('observed flowering', 'empirical time window', 'modelled: obs weather', 'modelled: hist sim weather'),
+                    values = c('lightgreen', 'lightgrey', 'lightblue', 'lightsalmon')) +
+  facet_grid(species ~ location) +
+  theme_bw(base_size = 15)
+
+
+
+
+
+#calculate shift function between locations
+#from cieza to zaragoza
+
+flower_summarized %>% 
+  filter(location %in% c('Klein-Altendorf', 'Zaragoza'),
+         species %in% c('Pear', 'Sweet Cherry')) %>% 
+  group_by(species) %>% 
+  summarise(shift_upper = )
+
+
+#simplify code by ditching flowering types for which we do not have simulated data
 
 
 
