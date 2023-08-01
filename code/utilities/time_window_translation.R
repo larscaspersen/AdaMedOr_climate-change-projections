@@ -39,7 +39,7 @@ est_phen_gaps <- function(target_df, target_col, split_col){
     
     miss_df <- comb_all[!(paste0(comb_all$Var1, comb_all$Var2) %in%
                             paste0(x$species, x$location)),] %>% 
-      set_colnames(c('species', 'location'))
+      magrittr::set_colnames(c('species', 'location'))
     
     return(miss_df)
   })
