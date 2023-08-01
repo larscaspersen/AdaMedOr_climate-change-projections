@@ -981,3 +981,142 @@ for(cult in cultivars){
 
 
 write.csv(master_pheno, 'data/master_phenology_repeated_splits.csv', row.names = FALSE)
+
+
+
+
+#----------------------------#
+#apple####
+#----------------------------#
+master_pheno <- read.csv('data/master_phenology_repeated_splits.csv')
+
+adamedor <- read.csv('data/combined_phenological_data_adamedor_clean.csv')
+
+adamedor_sum <- adamedor %>% 
+  group_by(species, cultivar) %>% 
+  summarise(n = n(),
+            locations = length(unique(location)),
+            countries = length(unique(country)))
+
+species_cult <- adamedor_sum %>% 
+  filter(species == 'Apple', 
+         n >= 20) %>% 
+  dplyr::pull(cultivar)
+
+
+
+#take all almond data
+
+species_sub <- adamedor %>% 
+  filter(species == 'Apple',
+         cultivar %in% species_cult) %>% 
+  drop_na(begin_flowering_f5) %>% 
+  mutate(begin_flowering_f5 = lubridate::ymd(begin_flowering_f5)) %>% 
+  mutate(doy_begin = lubridate::yday(begin_flowering_f5))
+
+locations <- unique(species_sub$location)
+
+
+cultivars <- unique(species_sub$cultivar)
+p <- 0.75
+seed <- 1234567890
+
+
+pheno_cal_list <- pheno_val_list <- list()
+
+for(cult in cultivars){
+  
+  pheno_cal_list[[cult]] <- pheno_val_list[[cult]] <- c()
+
+  #check which and how many locations
+  overview_df <- species_sub %>% 
+    dplyr::filter(cultivar == cult) %>% 
+    group_by(location) %>% 
+    summarise(n = n()) %>% 
+    mutate(n_cal = floor(n * p),
+           n_val = ceiling(n * (1 - p)))
+  
+  for(i in 1:10){
+    pheno_cal_list[[cult]][[i]] <- data.frame()
+    pheno_val_list[[cult]][[i]] <- data.frame()
+
+    #for each location decide how much we take for training and calibration
+    for(loc in overview_df$location){
+      #extract years with observations
+      pheno_years <- species_sub %>% 
+        dplyr::filter(cultivar == cult, location == loc) %>% 
+        summarise(pheno_years = unique(year)) %>% 
+        dplyr::pull(pheno_years)
+      
+      
+      #decide which years belong to calibration and validation
+      cal_years <- sort(sample(x = pheno_years, 
+                               size = overview_df$n_cal[overview_df$location == loc], 
+                               replace = FALSE))
+      
+      val_years <- pheno_years[!pheno_years %in% cal_years]
+      
+      
+      #extract corresponding phenology data
+      pheno_cal <- species_sub %>% 
+        dplyr::filter(location == loc, cultivar == cult, year %in% cal_years) %>% 
+        dplyr::pull(doy_begin)
+      
+      pheno_val <- species_sub %>% 
+        dplyr::filter(location == loc, cultivar == cult, year %in% val_years) %>% 
+        dplyr::pull(doy_begin)
+      
+      
+      
+      #add phenology information to list
+      pheno_cal_list[[cult]][[i]] <- rbind(pheno_cal_list[[cult]][[i]],
+                                           data.frame(location = loc,
+                                                      year = cal_years,
+                                                      pheno = pheno_cal))
+      
+      pheno_val_list[[cult]][[i]] <- rbind(pheno_val_list[[cult]][[i]],
+                                           data.frame(location = loc,
+                                                      year = val_years,
+                                                      pheno = pheno_val))
+      
+      
+      
+    }
+  }
+  
+  
+}
+
+
+r <- 10
+
+for(cult in cultivars){
+  for(i in 1:r){
+    
+    master_pheno <- rbind.data.frame(master_pheno,
+                                     cbind.data.frame(species = 'Apple', 
+                                                      cultivar = cult, 
+                                                      location = pheno_cal_list[[cult]][[i]]$location,
+                                                      repetition = i, 
+                                                      split = 'Calibration',
+                                                      year = pheno_cal_list[[cult]][[i]]$year,
+                                                      pheno = pheno_cal_list[[cult]][[i]]$pheno,
+                                                      measurement_type = 'begin_flowering_f5')
+    )
+    
+    master_pheno <- rbind.data.frame(master_pheno,
+                                     cbind.data.frame(species = 'Apple', 
+                                                      cultivar = cult, 
+                                                      location = pheno_val_list[[cult]][[i]]$location,
+                                                      repetition = i, 
+                                                      split = 'Validation',
+                                                      year = pheno_val_list[[cult]][[i]]$year,
+                                                      pheno = pheno_val_list[[cult]][[i]]$pheno,
+                                                      measurement_type = 'begin_flowering_f5')
+    )
+    
+  }
+}
+
+
+write.csv(master_pheno, 'data/master_phenology_repeated_splits.csv', row.names = FALSE)

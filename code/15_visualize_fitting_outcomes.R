@@ -10,12 +10,12 @@ source('code/utilities/load_save_fitting_results.R')
 
 #species <- c('data/fitting/')
 #species <- c('almond', 'apricot', 'european_plum', 'japanese_plum',  'pistachio', 'sweet_cherry', 'pear')
-species <- c('almond', 'apricot', 'european_plum', 'japanese_plum',  'pistachio', 'sweet_cherry')
+species <- c('almond', 'apple', 'apricot', 'european_plum', 'japanese_plum',  'pistachio', 'sweet_cherry')
 
 #number of repititions
 r <- 10
 
-apricot_fit <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <- almond_fit_old <-  list()
+apricot_fit <- apple_fit <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <- almond_fit_old <-  list()
 
 for(i in 1:r){
   apricot_fit[[i]] <- load_fitting_result('data/fitting/apricot/repeated_fitting_clean/', prefix = paste0('repeat', i, '_'))
@@ -26,11 +26,13 @@ for(i in 1:r){
   almond_fit_old[[i]]  <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting/', prefix = paste0('repeat', i, '_'))
   almond_fit[[i]] <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting_new_bounds', prefix = paste0('repeat', i, '_'))
   pear_fit[[i]] <- load_fitting_result('data/fitting/pear/', prefix = paste0('repeat', i, '_'))
+  apple_fit[[i]] <- load_fitting_result('data/fitting/apple/', prefix = paste0('repeat', i, '_'))
 }
 
   
 
 fit_list <- list('Apricot' = apricot_fit,
+                 'Apple' = apple_fit,
                  'European Plum' = eplum_fit,
                  'Japanese Plum' = jplum_fit,
                  'Pistachio' = pistachio_fit,
@@ -94,6 +96,9 @@ rm(meknes, meknes_season, sfax, sfax_season, cka, cka_season, zaragoza, zaragoza
 #read master pheno file
 
 master_pheno_split <- read.csv('data/master_phenology_repeated_splits.csv')
+
+master_pheno_split <- master_pheno_split %>% 
+  filter(!(species == 'Apple' & year == 1958))
 
 #now I should be able to make forecast for each data point in the master pheno file
 
@@ -252,6 +257,18 @@ performance %>%
   theme_bw(base_size = 15) +
   scale_y_discrete(limits=rev)
 
+performance %>% 
+  filter(species == 'Apple') %>% 
+  ggplot(aes(y = cultivar, fill = split, x = rpiq_adj)) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  geom_boxplot() +
+  theme_bw() +
+  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  #coord_cartesian(xlim = c(0, 10)) +
+  geom_vline(xintercept = 1, linetype = 'dashed') +
+  theme_bw(base_size = 15) +
+  scale_y_discrete(limits=rev)
+
 
 
 median_df <- performance %>% 
@@ -393,6 +410,19 @@ ensemble_prediction_df %>%
   xlab('Observed Bloom (Day of Year)') +
   theme_bw(base_size = 15) 
 ggsave('figures/ensemble_prediction_apricot.jpeg',
+       height = 15, width = 20, units = 'cm', device = 'jpeg')
+
+ensemble_prediction_df %>% 
+  filter(species == 'Apple') %>% 
+  ggplot(aes(x = pheno, y = pred)) +
+  geom_abline(slope = 1, linetype = 'dashed') +
+  geom_point() + 
+  geom_errorbar(aes(ymin = pred - sd, ymax = pred + sd)) +
+  facet_wrap(~cultivar) +
+  ylab('Predicted Bloom (Day of Year)') +
+  xlab('Observed Bloom (Day of Year)') +
+  theme_bw(base_size = 15) 
+ggsave('figures/ensemble_prediction_apple.jpeg',
        height = 15, width = 20, units = 'cm', device = 'jpeg')
   
 

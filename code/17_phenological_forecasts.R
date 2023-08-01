@@ -67,10 +67,11 @@ performance_df <- read.csv('data/performance_fitted_models.csv')
 ########################################################
 
 ## Load all the fitting results from the 10 repetitions
-apricot_fit <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <- almond_fit_old <-  list()
+apricot_fit <- apple_fit <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <- almond_fit_old <-  list()
 
 for(i in 1:10){
   apricot_fit[[i]] <- load_fitting_result('data/fitting/apricot/repeated_fitting_clean/', prefix = paste0('repeat', i, '_'))
+  apple_fit[[i]]  <- load_fitting_result('data/fitting/apple/', prefix = paste0('repeat', i, '_'))
   eplum_fit[[i]] <- load_fitting_result('data/fitting/european_plum/', prefix = paste0('repeat', i, '_'))
   jplum_fit[[i]] <- load_fitting_result('data/fitting/japanese_plum/', prefix = paste0('repeat', i, '_'))
   pistachio_fit[[i]] <- load_fitting_result('data/fitting/pistachio/', prefix = paste0('repeat', i, '_'))
@@ -83,6 +84,7 @@ for(i in 1:10){
 
 
 fit_list_combined <- list('Apricot' = apricot_fit,
+                          'Apple' = apple_fit,
                  'European Plum' = eplum_fit,
                  'Japanese Plum' = jplum_fit,
                  'Pistachio' = pistachio_fit,
@@ -91,6 +93,11 @@ fit_list_combined <- list('Apricot' = apricot_fit,
                  'Pear' = pear_fit)
 
 
+
+
+#-------------------------------#
+# FUTURE WEATHER ####
+#-------------------------------#
 
 
 
@@ -134,12 +141,18 @@ wrapper_ensemble_predictions <- function(SeasonList, input_list, plot_progress =
     do.call('cbind',.) %>% 
     reshape2::melt(id.vars = NULL, value.name = 'pheno_predicted') %>% 
     rename(year = Var1, species_cultivar = Var2) %>% 
-    merge.data.frame(sd_prediction, by = c('year', 'species_cultivar'))
+    merge.data.frame(sd_prediction, by = c('year', 'species_cultivar')) %>% 
+    arrange(year)
   
   
   
   return(prediction)
 }
+
+season_org <- SeasonList
+
+SeasonList <- season_org[[1]]
+plot_progress = TRUE
 
 
 #now, make predictions for each cultivar and each species
@@ -176,70 +189,130 @@ all_predictions_df <- all_predictions %>%
   bind_rows()
 
 #write.csv(all_predictions_df, 'data/projected_bloomdates_ensemble.csv', row.names = FALSE)
+
+
+#also do the predictions for apples
+
+# input_list <- list()
+# 
+# i <-2
+# spec <- 'Apple'
+#   
+# for(cult in names(fit_list_combined[[i]][[1]])){
+#   input_list[[paste0(spec, '_', cult)]] <- list(
+#     'models' = purrr::map(fit_list_combined[[i]], cult),
+#     'confidence' =     performance_df %>% 
+#       filter(species == spec, cultivar == cult, split == 'Validation') %>% 
+#       arrange(repetition) %>% 
+#       pull(rpiq_adj)
+#   )
+#   
+#   }
+# 
+# apple_predictions <- purrr::map(1:length(future_weather_list), function(i){
+#   split_name <- names(future_weather_list)[i] %>% 
+#     str_split_1(pattern = c('_')) %>%
+#     str_split(pattern = '\\.') %>% 
+#     unlist()
+#   
+#   lat <- Lat %>% 
+#     filter(station_name == split_name[1]) %>% 
+#     pull(latitude)
+#   
+#   out <- future_weather_list[[i]] %>% 
+#     chillR::stack_hourly_temps(latitude = lat) %>% 
+#     purrr::pluck('hourtemps') %>% 
+#     genSeasonList(years = 2001:2100) %>% 
+#     wrapper_ensemble_predictions(input_list) %>% 
+#     mutate(location = split_name[1],
+#            gcm = split_name[3],
+#            ssp = split_name[2],
+#            scenario_year = split_name[4])
+#   
+#   return(out)
+# }, .progress = TRUE)
+# 
+# 
+# all_predictions_df <- read.csv('data/projected_bloomdates_ensemble.csv')
+# 
+# all_predictions_df <- apple_predictions %>% 
+#   bind_rows() %>% 
+#   rbind(all_predictions_df)
+# 
+# write.csv(all_predictions_df, 'data/projected_bloomdates_ensemble.csv', row.names = FALSE)
+
 all_predictions_df <- read.csv('data/projected_bloomdates_ensemble.csv')
 
 
 
 
-adamedor <- read.csv('data/combined_phenological_data_adamedor_clean.csv')
+# adamedor <- read.csv('data/combined_phenological_data_adamedor_clean.csv')
+# 
+# adamedor <- adamedor %>% 
+#   filter(!(species == 'Apple' & location == 'Klein-Altendorf' & cultivar == 'Elstar' & year %in% c(2008, 2010)),
+#          !(species == 'Apricot' & location == 'Cieza' & cultivar == 'Sublime' & year == 2014))
+# 
+# flower_summarized <- adamedor %>% 
+#   group_by(species, location) %>% 
+#   mutate(begin_flowering_f5 = lubridate::yday(begin_flowering_f5), 
+#          flowering_f50 = lubridate::yday(flowering_f50)) %>% 
+#   summarize(mean.begin_flowering_f5 = mean(begin_flowering_f5, na.rm = TRUE),
+#             sd.begin_flowering_f5 = sd(begin_flowering_f5, na.rm = TRUE),
+#             max_dist.begin_flowering_f5 = max(abs(begin_flowering_f5 - mean(begin_flowering_f5, na.rm = TRUE)), na.rm = TRUE) * 1.5,
+#             mean.flowering_f50 = mean(flowering_f50, na.rm = TRUE),
+#             sd.flowering_f50 = sd(flowering_f50, na.rm = TRUE),
+#             max_dist.flowering_f50 = max(abs(flowering_f50 - mean(flowering_f50, na.rm = TRUE)), na.rm = TRUE) * 1.5) %>% 
+#   reshape2::melt(id.vars = c('species', 'location')) %>% 
+#   mutate(value = replace(value, value %in% c(NaN, NA, -Inf), NA)) %>% 
+#   separate(col = variable, into = c('variable', 'flowering_type'), sep = '\\.') %>% 
+#   reshape2::dcast(species + location + flowering_type ~ variable, value.var = 'value') %>% 
+#   relocate(species, location, flowering_type, mean, sd, max_dist) %>% 
+#   mutate(location = as.factor(location),
+#          species = recode(species, 
+#                           `European plum` = "European Plum", 
+#                           `Japanese plum` = "Japanese Plum") )
+# 
+# adamedor %>% 
+#   filter(species %in% c('Apricot', 'Pear', 'Sweet Cherry', 'Almond', 'European plum', 'Japanese plum', 'Pistachio'),
+#          location %in% c('Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf', 'Sfax')) %>% 
+#   dplyr::select(species, cultivar, location, begin_flowering_f5, flowering_f50) %>% 
+#   mutate(begin_flowering_f5 = lubridate::yday(begin_flowering_f5), 
+#          flowering_f50 = lubridate::yday(flowering_f50)) %>% 
+#   reshape2::melt(id.var = c('species', 'cultivar', 'location')) %>% 
+#   ggplot(aes(x = location, y = value)) +
+#   geom_boxplot() +
+#   facet_grid(species~variable)
+# 
+# #add the acceptable time window on that location
+# flower_summarized <- flower_summarized %>% 
+#   mutate(upper = mean + max_dist,
+#          lower = mean - max_dist)
+# 
+# 
+# adamedor %>% 
+#   filter(species %in% c('Apricot', 'Pear', 'Sweet Cherry', 'Almond', 'European plum', 'Japanese plum', 'Pistachio'),
+#          location %in% c('Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf', 'Sfax')) %>% 
+#   dplyr::select(species, cultivar, location, begin_flowering_f5, flowering_f50) %>% 
+#   mutate(begin_flowering_f5 = lubridate::yday(begin_flowering_f5), 
+#          flowering_f50 = lubridate::yday(flowering_f50)) %>% 
+#   reshape2::melt(id.var = c('species', 'cultivar', 'location'), variable.name = 'flowering_type') %>% 
+#   merge.data.frame(flower_summarized, by = c('species', 'location', 'flowering_type')) %>% 
+#   mutate(location = as.factor(location)) %>% 
+#   ggplot(aes(x = as.numeric(location), y = value, group = location)) +
+#   geom_rect(aes(ymin = lower, ymax = upper, xmin = as.numeric(location) - 0.45, xmax = as.numeric(location) + 0.45)) +
+#   geom_boxplot() +
+#   scale_x_continuous(breaks=c(1:5),
+#                      labels=c('Cieza', 'Klein-Altendorf', 'Meknes', 'Sfax', 'Zaragoza'))+
+#   facet_grid(species~flowering_type)
+# #--> we need a window for each location and each species....
 
-adamedor <- adamedor %>% 
-  filter(!(species == 'Apple' & location == 'Klein-Altendorf' & cultivar == 'Elstar' & year %in% c(2008, 2010)),
-         !(species == 'Apricot' & location == 'Cieza' & cultivar == 'Sublime' & year == 2014))
-
-flower_summarized <- adamedor %>% 
-  group_by(species, location) %>% 
-  mutate(begin_flowering_f5 = lubridate::yday(begin_flowering_f5), 
-         flowering_f50 = lubridate::yday(flowering_f50)) %>% 
-  summarize(mean.begin_flowering_f5 = mean(begin_flowering_f5, na.rm = TRUE),
-            sd.begin_flowering_f5 = sd(begin_flowering_f5, na.rm = TRUE),
-            max_dist.begin_flowering_f5 = max(abs(begin_flowering_f5 - mean(begin_flowering_f5, na.rm = TRUE)), na.rm = TRUE) * 1.5,
-            mean.flowering_f50 = mean(flowering_f50, na.rm = TRUE),
-            sd.flowering_f50 = sd(flowering_f50, na.rm = TRUE),
-            max_dist.flowering_f50 = max(abs(flowering_f50 - mean(flowering_f50, na.rm = TRUE)), na.rm = TRUE) * 1.5) %>% 
-  reshape2::melt(id.vars = c('species', 'location')) %>% 
-  mutate(value = replace(value, value %in% c(NaN, NA, -Inf), NA)) %>% 
-  separate(col = variable, into = c('variable', 'flowering_type'), sep = '\\.') %>% 
-  reshape2::dcast(species + location + flowering_type ~ variable, value.var = 'value') %>% 
-  relocate(species, location, flowering_type, mean, sd, max_dist) %>% 
-  mutate(location = as.factor(location),
-         species = recode(species, 
-                          `European plum` = "European Plum", 
-                          `Japanese plum` = "Japanese Plum") )
-
-adamedor %>% 
-  filter(species %in% c('Apricot', 'Pear', 'Sweet Cherry', 'Almond', 'European plum', 'Japanese plum', 'Pistachio'),
-         location %in% c('Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf', 'Sfax')) %>% 
-  dplyr::select(species, cultivar, location, begin_flowering_f5, flowering_f50) %>% 
-  mutate(begin_flowering_f5 = lubridate::yday(begin_flowering_f5), 
-         flowering_f50 = lubridate::yday(flowering_f50)) %>% 
-  reshape2::melt(id.var = c('species', 'cultivar', 'location')) %>% 
-  ggplot(aes(x = location, y = value)) +
-  geom_boxplot() +
-  facet_grid(species~variable)
-
-#add the acceptable time window on that location
-flower_summarized <- flower_summarized %>% 
-  mutate(upper = mean + max_dist,
-         lower = mean - max_dist)
 
 
-adamedor %>% 
-  filter(species %in% c('Apricot', 'Pear', 'Sweet Cherry', 'Almond', 'European plum', 'Japanese plum', 'Pistachio'),
-         location %in% c('Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf', 'Sfax')) %>% 
-  dplyr::select(species, cultivar, location, begin_flowering_f5, flowering_f50) %>% 
-  mutate(begin_flowering_f5 = lubridate::yday(begin_flowering_f5), 
-         flowering_f50 = lubridate::yday(flowering_f50)) %>% 
-  reshape2::melt(id.var = c('species', 'cultivar', 'location'), variable.name = 'flowering_type') %>% 
-  merge.data.frame(flower_summarized, by = c('species', 'location', 'flowering_type')) %>% 
-  mutate(location = as.factor(location)) %>% 
-  ggplot(aes(x = as.numeric(location), y = value, group = location)) +
-  geom_rect(aes(ymin = lower, ymax = upper, xmin = as.numeric(location) - 0.45, xmax = as.numeric(location) + 0.45)) +
-  geom_boxplot() +
-  scale_x_continuous(breaks=c(1:5),
-                     labels=c('Cieza', 'Klein-Altendorf', 'Meknes', 'Sfax', 'Zaragoza'))+
-  facet_grid(species~flowering_type)
-#--> we need a window for each location and each species....
+
+#--------------------------------------#
+# HISTORIC WEATHER PREDICTIONS ####
+#--------------------------------------#
+
 
 
 #read historic weather generator data+
@@ -284,6 +357,16 @@ hist_all_predictions <- read.csv('data/projected_bloomdates_ensemble_historic_sc
 #e plum f5
 #pear f50
 
+
+
+#-----------------------------------------------#
+# PREDICTIONS FOR OBSERVED WEATHER ####
+#-----------------------------------------------#
+
+stations <-
+  read.csv("data/weather_ready/weather_station_phenological_observations.csv")
+
+
 #make predictions for the actual weather data
 cka <- read.csv('data/weather_ready/cka_clean.csv') %>% 
   filter(Year < 2022)
@@ -294,31 +377,31 @@ zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv') %>%
   filter(Year < 2022)
 
 cka_season <- cka %>% 
-  stack_hourly_temps(lat = stations$Latitude[stations$station_name == 'Klein-Altendorf']) %>% 
+  stack_hourly_temps(lat = stations$latitude[stations$station_name == 'Klein-Altendorf']) %>% 
   purrr::pluck('hourtemps') %>% 
   genSeasonList(years = min(cka$Year):max(cka$Year))
 names(cka_season) <- min(cka$Year):max(cka$Year)
 
 cieza_season <- cieza %>% 
-  stack_hourly_temps(lat = stations$Latitude[stations$station_name == 'Cieza']) %>% 
+  stack_hourly_temps(lat = stations$latitude[stations$station_name == 'Cieza']) %>% 
   purrr::pluck('hourtemps') %>% 
   genSeasonList(years = min(cieza$Year):max(cieza$Year))
 names(cieza_season) <- min(cieza$Year):max(cieza$Year)
 
 sfax_season <- sfax %>% 
-  stack_hourly_temps(lat = stations$Latitude[stations$station_name == 'Sfax']) %>% 
+  stack_hourly_temps(lat = stations$latitude[stations$station_name == 'Sfax']) %>% 
   purrr::pluck('hourtemps') %>% 
   genSeasonList(years = min(sfax$Year):max(sfax$Year))
 names(sfax_season) <- min(sfax$Year):max(sfax$Year)
 
 meknes_season <- meknes %>% 
-  stack_hourly_temps(lat = stations$Latitude[stations$station_name == 'Meknes']) %>% 
+  stack_hourly_temps(lat = stations$latitude[stations$station_name == 'Meknes']) %>% 
   purrr::pluck('hourtemps') %>% 
   genSeasonList(years = min(meknes$Year):max(meknes$Year))
 names(meknes_season) <- min(meknes$Year):max(meknes$Year)
 
 zaragoza_season <- zaragoza %>% 
-  stack_hourly_temps(lat = stations$Latitude[stations$station_name == 'Zaragoza']) %>% 
+  stack_hourly_temps(lat = stations$latitude[stations$station_name == 'Zaragoza']) %>% 
   purrr::pluck('hourtemps') %>% 
   genSeasonList(years = min(zaragoza$Year):max(zaragoza$Year))
 names(zaragoza_season) <- min(zaragoza$Year):max(zaragoza$Year)
@@ -334,11 +417,11 @@ obs_all_predictions <- purrr::map(1:length(SeasonList), function(i){
   location <- names(SeasonList)[i] 
   
   out <- SeasonList[[i]] %>% 
-    wrapper_ensemble_predictions(input_list) %>% 
+    wrapper_ensemble_predictions(input_list, plot_progress = TRUE) %>% 
     mutate(location = location,
            gcm = 'observed weather',
            ssp = 'observed weather',
-           scenario_year = rep(names(SeasonList[[i]]), length(input_list)))
+           scenario_year = rep(names(SeasonList[[i]]), each = length(input_list)))
   
   
   return(out)
@@ -350,6 +433,19 @@ obs_all_predictions <- purrr::map(1:length(SeasonList), function(i){
 
 #write.csv(x = obs_all_predictions, file = 'data/projected_bloomdates_ensemble_observed_weather.csv', row.names = FALSE)
 obs_all_predictions <- read.csv('data/projected_bloomdates_ensemble_observed_weather.csv')
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 adamedor %>% 

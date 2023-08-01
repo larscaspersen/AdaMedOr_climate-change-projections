@@ -1,3 +1,46 @@
+#' Load fitted PhenoFlex model
+#' 
+#' Allows to read fitted PhenoFlex models, which were saved using \link[LarsChill]{save_fitting_list}
+#' 
+#' This function reads the saved PhenoFlex model to a list.
+#' 
+#' @param path character, specifying the location (relative to the working directory)
+#' 
+#' @param prefix character, added in front of the standard file name
+#' 
+#' @return list with the fitted objects. Elements are named after the files (without numbering and prefix)
+#' 
+#' @author Lars Caspersen
+#' @keywords utility
+#'  
+#' @export load_fitting_result
+
+load_fitting_result <- function(path, prefix){
+  
+  files <- list.files(path)
+  file_prefixes <- lapply(files, function(x) substr(x, 1, 
+                                                    nchar(prefix)))
+  scenario_files <- files[which(file_prefixes == prefix)]
+  # scenario_num_names <- lapply(scenario_files, function(x) substr(x, 
+  #                                                                 nchar(prefix) + 2, nchar(x)))
+  scenario_num_names <- lapply(scenario_files, function(x) substr(x, 
+                                                                  nchar(prefix)+1, nchar(x)))
+  nums <- unlist(lapply(scenario_num_names, function(x) as.numeric(strsplit(x, 
+                                                                            "_")[[1]][1])))
+  ordered_scenarios <- scenario_files[order(nums)]
+  ordered_scenario_names <- scenario_num_names[order(nums)]
+  scennames <- lapply(ordered_scenario_names, function(x) {
+    num <- strsplit(x, "_")[[1]][1]
+    substr(x, nchar(num) + 2, nchar(x) - 4)
+  })
+  output <- list()
+  for (i in 1:length(ordered_scenarios)) output[[i]] <- load_fitting_result_single(path = file.path(path, 
+                                                                                                    ordered_scenarios[[i]]))
+  names(output) <- scennames
+  return(output)
+}
+
+
 #function to read raw fitting results
 load_fitting_result_single <- function(path){
   
@@ -129,41 +172,6 @@ load_fitting_result_single <- function(path){
   )
 }
 
-load_fitting_result <- function(path, prefix){
-  
-  files <- list.files(path)
-  file_prefixes <- lapply(files, function(x) substr(x, 1, 
-                                                    nchar(prefix)))
-  scenario_files <- files[which(file_prefixes == prefix)]
-  # scenario_num_names <- lapply(scenario_files, function(x) substr(x, 
-  #                                                                 nchar(prefix) + 2, nchar(x)))
-  scenario_num_names <- lapply(scenario_files, function(x) substr(x, 
-                                                                  nchar(prefix)+1, nchar(x)))
-  nums <- unlist(lapply(scenario_num_names, function(x) as.numeric(strsplit(x, 
-                                                                            "_")[[1]][1])))
-  ordered_scenarios <- scenario_files[order(nums)]
-  ordered_scenario_names <- scenario_num_names[order(nums)]
-  scennames <- lapply(ordered_scenario_names, function(x) {
-    num <- strsplit(x, "_")[[1]][1]
-    substr(x, nchar(num) + 2, nchar(x) - 4)
-  })
-  output <- list()
-  for (i in 1:length(ordered_scenarios)) output[[i]] <- load_fitting_result_single(path = file.path(path, 
-                                                                                             ordered_scenarios[[i]]))
-  names(output) <- scennames
-  return(output)
-}
 
 
 
-#function to save fitting result
-save_fitting_list <- function(fit_list, path, prefix){
-  
-  purrr::pmap(list(fit_list, names(fit_list), 1:length(fit_list)), function(fitted, cultivar, n){
-    fname <- paste0(path, prefix, n,'_', cultivar, '.txt')
-    
-    capture.output(fitted, file = fname)
-  })
-  
-  
-}
