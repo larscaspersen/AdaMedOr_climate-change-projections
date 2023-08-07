@@ -104,6 +104,23 @@ adamedor_test <- adamedor %>%
   rbind.data.frame(adamedor_transformed)
 
 
+#there are redundancies in the almond data of santomera
+adamedor_old <- read.csv('data/combined_phenological_data_adamedor_clean.csv')
+
+#only contains almond data
+
+santomera <- adamedor_old %>% 
+  filter(location == 'Santomera') %>% 
+  split(f = ~ species  + cultivar) %>% 
+  purrr::map(function(x){ #remove duplicated years, always take the first reading
+    x[duplicated(x$year) == FALSE,]
+  }) %>% 
+  bind_rows()
 
 
-write.csv(adamedor_test, 'data/combined_phenological_data_adamedor_clean.csv', row.names = FALSE)
+adamedor <- adamedor_old %>% 
+  filter(location != 'Santomera') %>% 
+  rbind(santomera)
+
+
+write.csv(adamedor, 'data/combined_phenological_data_adamedor_clean.csv', row.names = FALSE)
