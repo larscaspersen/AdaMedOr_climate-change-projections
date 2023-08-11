@@ -11,6 +11,8 @@ library(LarsChill)
 # pistachio ####
 #--------------#
 
+r <- 10
+
 
 adamedor <- read.csv('data/combined_phenological_data_adamedor_clean.csv')
 
@@ -463,17 +465,15 @@ for(cult in cultivars){
 
 adamedor <- read.csv('data/combined_phenological_data_adamedor_clean.csv')
 
-adamedor_sum <- adamedor %>% 
+almond_cult <- adamedor %>% 
+  filter(is.na(flowering_f50) == FALSE,
+         species == 'Almond') %>% 
   group_by(species, cultivar) %>% 
   summarise(n = n(),
             locations = length(unique(location)),
-            countries = length(unique(country)))
-
-almond_cult <- adamedor_sum %>% 
-  filter(species == 'Almond', 
-         n >= 20) %>% 
+            countries = length(unique(country))) %>% 
+  filter(n >= 20) %>% 
   dplyr::pull(cultivar)
-
 
 
 #take all almond data
@@ -481,9 +481,9 @@ almond_cult <- adamedor_sum %>%
 almond_sub <- adamedor %>% 
   filter(species == 'Almond',
          cultivar %in% almond_cult) %>% 
-  drop_na(begin_flowering_f5) %>% 
-  mutate(begin_flowering_f5 = lubridate::ymd(begin_flowering_f5)) %>% 
-  mutate(doy_begin = lubridate::yday(begin_flowering_f5))
+  drop_na(flowering_f50) %>% 
+  mutate(flowering_f50 = lubridate::ymd(flowering_f50)) %>% 
+  mutate(doy_begin = lubridate::yday(flowering_f50))
 
 #only keep observations that have data for begin of flowering
 
@@ -493,12 +493,14 @@ p <- 0.75
 seed <- 1234567890
 
 
+
+set.seed(123456789)
 pheno_cal_list <- pheno_val_list <- list()
 
 for(cult in cultivars){
   
   pheno_cal_list[[cult]] <- pheno_val_list[[cult]] <- c()
-  
+
   #check which and how many locations
   overview_df <- almond_sub %>% 
     dplyr::filter(cultivar == cult) %>% 
@@ -510,7 +512,7 @@ for(cult in cultivars){
   for(i in 1:10){
     pheno_cal_list[[cult]][[i]] <- data.frame()
     pheno_val_list[[cult]][[i]] <- data.frame()
-    
+
     #for each location decide how much we take for training and calibration
     for(loc in overview_df$location){
       #extract years with observations
@@ -550,7 +552,7 @@ for(cult in cultivars){
                                                       year = val_years,
                                                       pheno = pheno_val))
       
-      
+
     }
   }
   
@@ -569,7 +571,7 @@ for(cult in cultivars){
                                                       split = 'Calibration',
                                                       year = pheno_cal_list[[cult]][[i]]$year,
                                                       pheno = pheno_cal_list[[cult]][[i]]$pheno,
-                                                      measurement_type = 'begin_flowering_f5')
+                                                      measurement_type = 'flowering_f50')
     )
     
     master_pheno <- rbind.data.frame(master_pheno,
@@ -580,7 +582,7 @@ for(cult in cultivars){
                                                       split = 'Validation',
                                                       year = pheno_val_list[[cult]][[i]]$year,
                                                       pheno = pheno_val_list[[cult]][[i]]$pheno,
-                                                      measurement_type = 'begin_flowering_f5')
+                                                      measurement_type = 'flowering_f50')
     )
     
   }

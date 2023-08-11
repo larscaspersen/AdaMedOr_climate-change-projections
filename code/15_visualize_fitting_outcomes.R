@@ -4,7 +4,9 @@ library(chillR)
 library(tidyverse)
 library(LarsChill)
 
-source('code/utilities/load_save_fitting_results.R')
+# source('code/utilities/save_fitting_list.R')
+# source('code/utilities/load_fitting_result.R')
+
 
 #load fitting results
 
@@ -15,7 +17,7 @@ species <- c('almond', 'apple', 'apricot', 'european_plum', 'japanese_plum',  'p
 #number of repititions
 r <- 10
 
-apricot_fit <- apple_fit <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <- almond_fit_old <-  list()
+apricot_fit <- apple_fit <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <- almond_fit_old <- almond_with_sanotmera <-  list()
 
 for(i in 1:r){
   apricot_fit[[i]] <- load_fitting_result('data/fitting/apricot/repeated_fitting_clean/', prefix = paste0('repeat', i, '_'))
@@ -25,6 +27,7 @@ for(i in 1:r){
   cherry_fit[[i]] <- load_fitting_result('data/fitting/sweet_cherry/repeated_fitting/', prefix = paste0('repeat', i, '_'))
   almond_fit_old[[i]]  <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting/', prefix = paste0('repeat', i, '_'))
   almond_fit[[i]] <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting_new_bounds', prefix = paste0('repeat', i, '_'))
+  almond_with_sanotmera[[i]]  <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting_santomera_cleanly_saved/', prefix = paste0('repeat', i, '_'))
   pear_fit[[i]] <- load_fitting_result('data/fitting/pear/', prefix = paste0('repeat', i, '_'))
   apple_fit[[i]] <- load_fitting_result('data/fitting/apple/', prefix = paste0('repeat', i, '_'))
 }
@@ -37,7 +40,7 @@ fit_list <- list('Apricot' = apricot_fit,
                  'Japanese Plum' = jplum_fit,
                  'Pistachio' = pistachio_fit,
                  'Sweet Cherry' = cherry_fit,
-                 'Almond' = almond_fit_old,
+                 'Almond' = almond_with_sanotmera,
                  'Pear' = pear_fit)
 
 
@@ -50,6 +53,7 @@ zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv')
 sfax <- read.csv('data/weather_ready/sfax_clean.csv')
 meknes <- read.csv('data/weather_ready/meknes_clean.csv')
 cieza <- read.csv('data/weather_ready/cieza_clean_patched.csv')
+santomera <- read.csv('data/weather_ready/murcia_clean.csv')
 
 weather_stations <- read.csv('data/weather_ready/weather_station_phenological_observations.csv')
 
@@ -60,6 +64,7 @@ zaragoza_hourly <- stack_hourly_temps(zaragoza, latitude =  weather_stations$lat
 sfax_hourly <- stack_hourly_temps(sfax, latitude =  weather_stations$latitude[weather_stations$station_name == 'Sfax'])
 cieza_hourly <- stack_hourly_temps(cieza, latitude =  weather_stations$latitude[weather_stations$station_name == 'Cieza'])
 meknes_hourly <- stack_hourly_temps(meknes, latitude =  weather_stations$latitude[weather_stations$station_name == 'Meknes'])
+santomera_hourly <- stack_hourly_temps(meknes, latitude =  weather_stations$latitude[weather_stations$station_name == 'Santomera'])
 
 
 cka_hourly <- cka_hourly$hourtemps
@@ -67,29 +72,33 @@ zaragoza_hourly <- zaragoza_hourly$hourtemps
 sfax_hourly <- sfax_hourly$hourtemps
 cieza_hourly <- cieza_hourly$hourtemps
 meknes_hourly <- meknes_hourly$hourtemps
+santomera_hourly <- santomera_hourly$hourtemps
 
 #make seasonal list
-cka_season <- genSeasonList(cka_hourly, years = min(cka$Year):max(cka$Year))
-zaragoza_season <- genSeasonList(zaragoza_hourly, years = min(zaragoza$Year):max(zaragoza$Year))
-sfax_season <- genSeasonList(sfax_hourly, years = min(sfax$Year):max(sfax$Year))
-cieza_season <- genSeasonList(cieza_hourly, years = min(cieza$Year):max(cieza$Year))
-meknes_season <- genSeasonList(meknes_hourly, years = min(meknes$Year):max(meknes$Year))
+cka_season <- genSeasonList(cka_hourly, years = (min(cka$Year)+1):max(cka$Year))
+zaragoza_season <- genSeasonList(zaragoza_hourly, years = (min(zaragoza$Year)+1):max(zaragoza$Year))
+sfax_season <- genSeasonList(sfax_hourly, years = (min(sfax$Year)+1):max(sfax$Year))
+cieza_season <- genSeasonList(cieza_hourly, years = (min(cieza$Year)+1):max(cieza$Year))
+meknes_season <- genSeasonList(meknes_hourly, years = (min(meknes$Year)+1):max(meknes$Year))
+santomera_season <- genSeasonList(santomera_hourly, years = (min(santomera$Year)+1):max(santomera$Year))
 
 
-names(cka_season) <- min(cka$Year):max(cka$Year)
-names(zaragoza_season) <- min(zaragoza$Year):max(zaragoza$Year)
-names(sfax_season) <- min(sfax$Year):max(sfax$Year)
-names(cieza_season) <-  min(cieza$Year):max(cieza$Year)
-names(meknes_season) <- min(meknes$Year):max(meknes$Year)
+names(cka_season) <- (min(cka$Year)+1):max(cka$Year)
+names(zaragoza_season) <- (min(zaragoza$Year)+1):max(zaragoza$Year)
+names(sfax_season) <- (min(sfax$Year)+1):max(sfax$Year)
+names(cieza_season) <-  (min(cieza$Year)+1):max(cieza$Year)
+names(meknes_season) <- (min(meknes$Year)+1):max(meknes$Year)
+names(santomera_season) <- (min(santomera$Year)+1):max(santomera$Year)
 
 SeasonList <- list('Zaragoza' = zaragoza_season, 
                    'Klein-Altendorf' = cka_season,
                    'Sfax' = sfax_season,
                    'Cieza' = cieza_season,
-                   'Meknes' = meknes_season)
+                   'Meknes' = meknes_season,
+                   'Santomera' = santomera_season)
 
 
-rm(meknes, meknes_season, sfax, sfax_season, cka, cka_season, zaragoza, zaragoza_season, cieza, cieza_season)
+rm(meknes, meknes_season, sfax, sfax_season, cka, cka_season, zaragoza, zaragoza_season, cieza, cieza_season, santomera, santomera_season)
 
 
 #need to do the splitting again and then safe the results!!!!
@@ -98,7 +107,8 @@ rm(meknes, meknes_season, sfax, sfax_season, cka, cka_season, zaragoza, zaragoza
 master_pheno_split <- read.csv('data/master_phenology_repeated_splits.csv')
 
 master_pheno_split <- master_pheno_split %>% 
-  filter(!(species == 'Apple' & year == 1958))
+  filter(!(species == 'Apple' & year == 1958),
+         !(species == 'Pear' & year == 1958))
 
 #now I should be able to make forecast for each data point in the master pheno file
 
@@ -137,7 +147,7 @@ for(spec in names(fit_list)){
       sub_SeasonList <-  purrr::map2(sub$location, sub$year, function(loc, yr) SeasonList[[loc]][[as.character(yr)]])
       
       #predict bloom days
-      sub$pred <- return_predicted_days(convert_parameters(par), 
+      sub$pred <- return_predicted_days(par = convert_parameters(par), 
                                           modelfn = custom_PhenoFlex_GDHwrapper, 
                                           SeasonList =sub_SeasonList)
       
@@ -271,14 +281,32 @@ performance %>%
 
 
 
+#look into the actual number of data that went into the fitting
+freq_input <- master_pheno_split %>% 
+  filter(repetition == 1) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(n = n())
+
+enough_obs <- freq_input %>% 
+  filter(n >= 20)
+
+#2 runs of desmayo are really bad. why?
+#very high predictions. but maybe the function simply fails to convert predictions before 1st Jan to be shown in the proper way.
+#desmayo 3 or 7
+
+
 median_df <- performance %>% 
-  filter(split == 'Calibration') %>% 
+  filter(split == 'Calibration',
+         species %in% enough_obs$species,
+         cultivar %in% enough_obs$cultivar) %>% 
   group_by(species, cultivar) %>% 
   summarise(median_rpiq = median(rpiq_adj),
             median_rmse = median(rmse),
             median_bias = median(mean_bias))
 
 performance %>% 
+  filter(species %in% enough_obs$species,
+         cultivar %in% enough_obs$cultivar) %>% 
   merge.data.frame(median_df, by = c('species', 'cultivar')) %>% 
   ggplot(aes(y = reorder(cultivar, median_rmse), fill = split, x = rmse)) +
   # geom_bar(stat = 'identity', position = 'dodge') +
@@ -328,43 +356,6 @@ ggsave('figures/mean_bias_cult.jpeg', device = 'jpeg',
 
 #can I use the ensemble to make predictions? maybe use the rpiq of validation data as a weight for the prediction?
 
-pheno_ensemble_prediction <- function(par_list, confidence, temp, return_se = TRUE){
-  
-  predicted <- purrr::map(par_list, function(x){
-    par <- x$xbest
-    par <- c(par[1:4], theta_star, par[5:8], Tc, par[9:10])
-    
-    return_predicted_days(convert_parameters(par), 
-                          modelfn = custom_PhenoFlex_GDHwrapper, 
-                          SeasonList =temp)
-  }) %>% 
-    do.call('cbind', .) %>% 
-    as.matrix()
-  weights <- confidence / sum(confidence)
-  
-  weighted_pred <- as.vector(predicted %*% weights)
-  
-  sd_pred <- predicted %>% 
-    t() %>% 
-    as.data.frame() %>% 
-    set_colnames( 1:nrow(predicted)) %>% 
-    reshape2::melt(id.vars = NULL) %>% 
-    group_by(variable) %>% 
-    summarise(sd = sd(value)) %>% 
-    pull(sd)
-  #scale rpiq_values
-
-  
-  if(return_se){
-    return(list(predicted = weighted_pred, sd = sd_pred))
-  } else{
-    return(weighted_pred)
-  }
-  
-}
-
-
-
 
 ensemble_prediction_df <- data.frame()
 
@@ -385,7 +376,7 @@ for(spec in names(fit_list)){
         pull(rpiq_adj)
         
       
-      pred_out <- pheno_ensemble_prediction(par_list, confidence, temp = sub_SeasonList)
+      pred_out <- LarsChill::pheno_ensemble_prediction(par_list, confidence, temp = sub_SeasonList)
 
       
       sub$pred <- pred_out$predicted
@@ -551,182 +542,182 @@ ggsave('figures/rpiq_ensemble.jpeg', device = 'jpeg',
 
 
 
-#compare estimated model parameters for almonds
-
-par_df <- purrr::map(names(fit_list), function(spec){
-  purrr::map(1:10, function(i){
-    purrr::map(fit_list[[spec]][[i]], 'xbest') %>% 
-      bind_rows() %>% 
-      t() %>% 
-      data.frame() %>% 
-      mutate(round = i)
-  }) %>% 
-    bind_rows() %>% 
-    mutate(species = spec)
-}) %>% 
-  bind_rows()
-
-
-
-
-par_df$cultivar <- purrr::map_chr(str_split(row.names(par_df), pattern = '\\...'), 1)
-
-rownames(par_df) <- NULL
-colnames(par_df)[1:10] <- c('yc', 'zc', 's1', 'Tu', 'theta_c', 'tau', 'pie_c', 'Tf', 'Tb', 'slope')
-
-
-boundary_df <- data.frame(value = c(20,    100,    0.1,    15,     284,       16,      24,     2,     2,     1.2, 80,    500,    1.0,    30,     287,       48,      50,    10,    10,     5.00), 
-                          variable = rep(c('yc', 'zc', 's1', 'Tu', 'theta_c', 'tau', 'pie_c', 'Tf', 'Tb', 'slope')),2) 
-
-par_df %>% 
-  filter(species == 'Almond') %>% 
-  reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
-  ggplot(aes(x = cultivar, y = value)) +
-  geom_boxplot() +
-  geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
-  facet_wrap(~variable, scales = 'free_y')
-
-
-par_df %>% 
-  filter(species == 'Apricot') %>% 
-  reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
-  ggplot(aes(x = cultivar, y = value)) +
-  geom_boxplot() +
-  geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
-  facet_wrap(~variable, scales = 'free_y')
-
-par_df %>% 
-  filter(species == 'Pear') %>% 
-  reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
-  ggplot(aes(x = cultivar, y = value)) +
-  geom_boxplot() +
-  geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
-  facet_wrap(~variable, scales = 'free_y')
-
-par_df %>% 
-  filter(species == 'Sweet Cherry') %>% 
-  reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
-  ggplot(aes(x = cultivar, y = value)) +
-  geom_boxplot() +
-  geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
-  facet_wrap(~variable, scales = 'free_y')
-  
-
-par_df %>% 
-  filter(species == 'European Plum') %>% 
-  reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
-  ggplot(aes(x = cultivar, y = value)) +
-  geom_boxplot() +
-  geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
-  facet_wrap(~variable, scales = 'free_y')
-
-par_df %>% 
-  filter(species == 'Japanese Plum') %>% 
-  reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
-  ggplot(aes(x = cultivar, y = value)) +
-  geom_boxplot() +
-  geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
-  facet_wrap(~variable, scales = 'free_y')
-
-par_df %>% 
-  filter(species == 'Pistachio') %>% 
-  reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
-  ggplot(aes(x = cultivar, y = value)) +
-  geom_boxplot() +
-  geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
-  facet_wrap(~variable, scales = 'free_y')
-
-
-#maybe lower yc and higher zc for almond and pistachio
-
-
-#run again with staring points and adjusted search space
-
-
-
-
-
-almond_fit_list <- list('Almond old' = almond_fit_old,
-                        'Almond new bound' = almond_fit)
-
-almond_prediction_df <- data.frame()
-for(spec in names(almond_fit_list)){
-  for(i in 1:r){
-    
-    cultivars <- names(almond_fit_list[[spec]][[i]])
-    for(cult in cultivars){
-      
-      
-      
-      #extract parameters
-      par <- almond_fit_list[[spec]][[i]][[cult]]$xbest 
-      #add fixed parameters
-      par <- c(par[1:4], theta_star, par[5:8], Tc, par[9:10])
-      
-      #subset master file
-      sub <- master_pheno_split %>% 
-        filter(species == 'Almond',
-               cultivar == cult,
-               repetition == i)
-      
-      #generate seasonlist
-      sub_SeasonList <-  purrr::map2(sub$location, sub$year, function(loc, yr) SeasonList[[loc]][[as.character(yr)]])
-      
-      #predict bloom days
-      sub$pred <- return_predicted_days(convert_parameters(par), 
-                                        modelfn = custom_PhenoFlex_GDHwrapper, 
-                                        SeasonList =sub_SeasonList)
-      
-      sub$version <- spec
-      
-      almond_prediction_df <- rbind.data.frame(almond_prediction_df,
-                                        sub)
-      
-      
-      
-    }
-  }
-}
-
-almond_prediction_df$residual <- almond_prediction_df$pred - almond_prediction_df$pheno
-
-
-almond_iqr_df <- almond_prediction_df %>% 
-  group_by(version, cultivar, repetition) %>% 
-  summarise(iqr = IQR(pheno))
-
-
-#now I can generate performance data
-almond_performance <- almond_prediction_df %>% 
-  merge.data.frame(almond_iqr_df, by = c('version', 'cultivar', 'repetition')) %>% 
-  dplyr::group_by(version, cultivar, repetition, split, iqr) %>% 
-  dplyr::summarise(rmse = RMSEP(predicted = pred, observed = pheno),
-                   mean_bias = mean(pred - pheno)) %>% 
-  mutate(rpiq_adj = iqr / rmse)
-
-
-almond_performance %>% 
-  ggplot(aes(y = cultivar, fill = version, x = rpiq_adj)) +
-  # geom_bar(stat = 'identity', position = 'dodge') +
-  geom_boxplot() +
-  theme_bw() +
-  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
-  #coord_cartesian(xlim = c(0, 10)) +
-  geom_vline(xintercept = 1, linetype = 'dashed') +
-  theme_bw(base_size = 15) +
-  scale_y_discrete(limits=rev) +
-  facet_grid(~split)
-
-almond_performance %>% 
-  ggplot(aes(y = cultivar, fill = version, x = rmse)) +
-  # geom_bar(stat = 'identity', position = 'dodge') +
-  geom_boxplot() +
-  theme_bw() +
-  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
-  #coord_cartesian(xlim = c(0, 10)) +
-  geom_vline(xintercept = 5, linetype = 'dashed') +
-  theme_bw(base_size = 15) +
-  scale_y_discrete(limits=rev) +
-  facet_grid(~split)
-
-'NO IMPROVEMENT AT ALL'
+# #compare estimated model parameters for almonds
+# 
+# par_df <- purrr::map(names(fit_list), function(spec){
+#   purrr::map(1:10, function(i){
+#     purrr::map(fit_list[[spec]][[i]], 'xbest') %>% 
+#       bind_rows() %>% 
+#       t() %>% 
+#       data.frame() %>% 
+#       mutate(round = i)
+#   }) %>% 
+#     bind_rows() %>% 
+#     mutate(species = spec)
+# }) %>% 
+#   bind_rows()
+# 
+# 
+# 
+# 
+# par_df$cultivar <- purrr::map_chr(str_split(row.names(par_df), pattern = '\\...'), 1)
+# 
+# rownames(par_df) <- NULL
+# colnames(par_df)[1:10] <- c('yc', 'zc', 's1', 'Tu', 'theta_c', 'tau', 'pie_c', 'Tf', 'Tb', 'slope')
+# 
+# 
+# boundary_df <- data.frame(value = c(20,    100,    0.1,    15,     284,       16,      24,     2,     2,     1.2, 80,    500,    1.0,    30,     287,       48,      50,    10,    10,     5.00), 
+#                           variable = rep(c('yc', 'zc', 's1', 'Tu', 'theta_c', 'tau', 'pie_c', 'Tf', 'Tb', 'slope')),2) 
+# 
+# par_df %>% 
+#   filter(species == 'Almond') %>% 
+#   reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
+#   ggplot(aes(x = cultivar, y = value)) +
+#   geom_boxplot() +
+#   geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
+#   facet_wrap(~variable, scales = 'free_y')
+# 
+# 
+# par_df %>% 
+#   filter(species == 'Apricot') %>% 
+#   reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
+#   ggplot(aes(x = cultivar, y = value)) +
+#   geom_boxplot() +
+#   geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
+#   facet_wrap(~variable, scales = 'free_y')
+# 
+# par_df %>% 
+#   filter(species == 'Pear') %>% 
+#   reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
+#   ggplot(aes(x = cultivar, y = value)) +
+#   geom_boxplot() +
+#   geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
+#   facet_wrap(~variable, scales = 'free_y')
+# 
+# par_df %>% 
+#   filter(species == 'Sweet Cherry') %>% 
+#   reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
+#   ggplot(aes(x = cultivar, y = value)) +
+#   geom_boxplot() +
+#   geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
+#   facet_wrap(~variable, scales = 'free_y')
+#   
+# 
+# par_df %>% 
+#   filter(species == 'European Plum') %>% 
+#   reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
+#   ggplot(aes(x = cultivar, y = value)) +
+#   geom_boxplot() +
+#   geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
+#   facet_wrap(~variable, scales = 'free_y')
+# 
+# par_df %>% 
+#   filter(species == 'Japanese Plum') %>% 
+#   reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
+#   ggplot(aes(x = cultivar, y = value)) +
+#   geom_boxplot() +
+#   geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
+#   facet_wrap(~variable, scales = 'free_y')
+# 
+# par_df %>% 
+#   filter(species == 'Pistachio') %>% 
+#   reshape2::melt(id.vars = c('round', 'cultivar', 'species')) %>% 
+#   ggplot(aes(x = cultivar, y = value)) +
+#   geom_boxplot() +
+#   geom_hline(data = boundary_df, aes(yintercept = value), linetype = 'dashed') +
+#   facet_wrap(~variable, scales = 'free_y')
+# 
+# 
+# #maybe lower yc and higher zc for almond and pistachio
+# 
+# 
+# #run again with staring points and adjusted search space
+# 
+# 
+# 
+# 
+# 
+# almond_fit_list <- list('Almond old' = almond_fit_old,
+#                         'Almond new bound' = almond_fit)
+# 
+# almond_prediction_df <- data.frame()
+# for(spec in names(almond_fit_list)){
+#   for(i in 1:r){
+#     
+#     cultivars <- names(almond_fit_list[[spec]][[i]])
+#     for(cult in cultivars){
+#       
+#       
+#       
+#       #extract parameters
+#       par <- almond_fit_list[[spec]][[i]][[cult]]$xbest 
+#       #add fixed parameters
+#       par <- c(par[1:4], theta_star, par[5:8], Tc, par[9:10])
+#       
+#       #subset master file
+#       sub <- master_pheno_split %>% 
+#         filter(species == 'Almond',
+#                cultivar == cult,
+#                repetition == i)
+#       
+#       #generate seasonlist
+#       sub_SeasonList <-  purrr::map2(sub$location, sub$year, function(loc, yr) SeasonList[[loc]][[as.character(yr)]])
+#       
+#       #predict bloom days
+#       sub$pred <- return_predicted_days(convert_parameters(par), 
+#                                         modelfn = custom_PhenoFlex_GDHwrapper, 
+#                                         SeasonList =sub_SeasonList)
+#       
+#       sub$version <- spec
+#       
+#       almond_prediction_df <- rbind.data.frame(almond_prediction_df,
+#                                         sub)
+#       
+#       
+#       
+#     }
+#   }
+# }
+# 
+# almond_prediction_df$residual <- almond_prediction_df$pred - almond_prediction_df$pheno
+# 
+# 
+# almond_iqr_df <- almond_prediction_df %>% 
+#   group_by(version, cultivar, repetition) %>% 
+#   summarise(iqr = IQR(pheno))
+# 
+# 
+# #now I can generate performance data
+# almond_performance <- almond_prediction_df %>% 
+#   merge.data.frame(almond_iqr_df, by = c('version', 'cultivar', 'repetition')) %>% 
+#   dplyr::group_by(version, cultivar, repetition, split, iqr) %>% 
+#   dplyr::summarise(rmse = RMSEP(predicted = pred, observed = pheno),
+#                    mean_bias = mean(pred - pheno)) %>% 
+#   mutate(rpiq_adj = iqr / rmse)
+# 
+# 
+# almond_performance %>% 
+#   ggplot(aes(y = cultivar, fill = version, x = rpiq_adj)) +
+#   # geom_bar(stat = 'identity', position = 'dodge') +
+#   geom_boxplot() +
+#   theme_bw() +
+#   #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+#   #coord_cartesian(xlim = c(0, 10)) +
+#   geom_vline(xintercept = 1, linetype = 'dashed') +
+#   theme_bw(base_size = 15) +
+#   scale_y_discrete(limits=rev) +
+#   facet_grid(~split)
+# 
+# almond_performance %>% 
+#   ggplot(aes(y = cultivar, fill = version, x = rmse)) +
+#   # geom_bar(stat = 'identity', position = 'dodge') +
+#   geom_boxplot() +
+#   theme_bw() +
+#   #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+#   #coord_cartesian(xlim = c(0, 10)) +
+#   geom_vline(xintercept = 5, linetype = 'dashed') +
+#   theme_bw(base_size = 15) +
+#   scale_y_discrete(limits=rev) +
+#   facet_grid(~split)
+# 
+# 'NO IMPROVEMENT AT ALL'

@@ -11,11 +11,19 @@ stations <- stations %>%
          Latitude = latitude,
          Longitude = longitude)
 
-source('code/utilities/extract_cmip6_no_internet.R')
+#source('code/utilities/extract_cmip6_no_internet.R')
 
-cmip6_downloaded <- extract_cmip6_no_internet(coordinates = stations)
+#cmip6_downloaded <- extract_cmip6_no_internet(coordinates = stations)
+
+cmip6_downloaded <- LarsChill::get_scenarioMIP_data(coordinates = stations, 
+                                                    start_year = 2015, 
+                                                    end_year = 2100,
+                                                    metric = c('tasmin', 'tasmax'),
+                                                    experiment = c('ssp126', 'ssp245', 'ssp370', 'ssp585'))
 
 formatted_cmip6 <- format_downloaded_ssp(cmip6_downloaded)
+#I have only 5 gcms, that is a bit poor
+
 
 #remove the empty historic scenarios
 remove_empy_entries <- function(cmip6_one_station){
@@ -60,13 +68,15 @@ sfax <- read.csv('data/weather_ready/sfax_clean.csv')
 meknes <- read.csv('data/weather_ready/meknes_clean.csv')
 zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv') %>% 
   filter(Year < 2022)
+santomera <- read.csv('data/weather_ready/murcia_clean.csv')
 
 names(formatted_cmip6)
 weather_list <- list('Zaragoza' = zaragoza, 
      'Klein-Altendorf' = cka, 
      'Sfax' = sfax,
      'Cieza' = cieza,
-     'Meknes' = meknes)
+     'Meknes' = meknes,
+     'Santomera' = santomera)
 
 
 scenarios_rel_change <- gen_rel_change_scenario(downloaded_list = formatted_cmip6_clean, 
@@ -83,12 +93,24 @@ names(weather_list)
 i <- 1
 dir.create('data/future_weather')
 
-for(loc in c("Zaragoza", "Sfax", "Cieza", "Meknes", "Klein-Altendorf")){
+for(loc in c("Zaragoza", "Sfax", "Cieza", "Meknes", "Klein-Altendorf", 'Santomera')){
   
   for(i in 1:length(scenarios_rel_change[[loc]])){
     
-    print(paste0('Generating ', loc, ', scenario number: ', i, ' of ', length(scenarios_rel_change[[loc]])))
+    #get scenario file
     scen <- names(scenarios_rel_change[[loc]])[i]
+    
+    #get file name
+    fname <- paste0('data/future_weather/', i, '_', loc, '_', scen, '.csv')
+    
+    #check if the file already exists
+    if(file.exists(fname)){
+      next()
+    }
+    
+    
+    print(paste0('Generating ', loc, ', scenario number: ', i, ' of ', length(scenarios_rel_change[[loc]])))
+
     
     temps <- temperature_generation(weather = weather_list[[loc]],
                                     #years = c(min(weather_list$Zaragoza$Year),max(weather_list$Zaragoza$Year)),
@@ -97,7 +119,7 @@ for(loc in c("Zaragoza", "Sfax", "Cieza", "Meknes", "Klein-Altendorf")){
                                     temperature_scenario = list(scenarios_rel_change[[loc]][[i]]),
                                     temperature_check_args = list(scenario_check_thresholds = c(-7, 15)))
     
-    fname <- paste0('data/future_weather/', i, '_', loc, '_', scen, '.csv')
+
     write.csv(x = temps, file = fname, row.names = FALSE)
     
   }
