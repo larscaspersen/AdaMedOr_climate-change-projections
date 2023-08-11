@@ -2,6 +2,7 @@
 library(tidyverse)
 library(ggplot2)
 library(patchwork)
+library(LarsChill)
 
 
 setwd('../fruittree_portfolio/')
@@ -70,10 +71,212 @@ ggsave('figures/paper/rpiq_all_cult.jpeg', device = 'jpeg',
 
 
 
-#--------------------------------------------------------------#
-# Time Windows ####
-#--------------------------------------------------------------#
 
+
+#----------------------------------------------#
+#Performance across species ####
+#----------------------------------------------#
+
+prediction_df <- read.csv('data/predicted_flowering_vs_observed.csv')
+
+prediction_df <- prediction_df %>% 
+  filter(!(species == 'Apple' & location == 'Klein-Altendorf' & cultivar == 'Elstar' & year %in% c(2008, 2010)),  #seems to be outlier
+         !(species == 'Apricot' & location == 'Cieza' & cultivar == 'Sublime' & year == 2014), #seems to be outlier
+         !(location == 'Klein-Altendorf' & year == 1958))  #weather data starts in 1958 so predicting that year does not make sense
+
+iqr_df <- prediction_df %>% 
+  filter(repetition == 1) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(iqr_obs = IQR(pheno))
+
+performance <- prediction_df %>% 
+  merge.data.frame(iqr_df, by = c('species', 'cultivar'), all.x = TRUE) %>% 
+  group_by(species, cultivar, repetition, split) %>% 
+  summarise(rmse = chillR::RMSEP(predicted = pred, observed = pheno),
+            iqr_obs = mean(iqr_obs) ,
+            rpiq_adj = iqr_obs / rmse) 
+
+performance %>% 
+  filter(split == 'Validation') %>% 
+  ggplot(aes(y = species, x = rpiq_adj)) +
+  geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  scale_y_discrete(limits = rev)+
+  ylab('') +
+  xlab('Ratio of Performance to Interquartile Distance  (RPIQ) for Validation Data') + 
+  geom_vline(xintercept = 1, linetype = 'dashed') +
+  #  ggsci::scale_fill_tron()+
+  #  scale_fill_manual(values = viridis::viridis(8))+
+  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
+  theme_bw()
+ggsave('figures/paper/RPIQ_all_cultivars.jpeg', height = 15, width = 20, units = 'cm', device = 'jpeg')
+
+
+performance %>% 
+  filter(split == 'Validation') %>% 
+  ggplot(aes(y = species, x = rmse)) +
+  geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  scale_y_discrete(limits = rev)+
+  ylab('') +
+  xlab('Root Mean Square Error (RMSE) for Validation Data') + 
+  #geom_vline(xintercept = 1, linetype = 'dashed') +
+  #  ggsci::scale_fill_tron()+
+  #  scale_fill_manual(values = viridis::viridis(8))+
+  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
+  theme_bw()
+ggsave('figures/paper/RMSE_all_cultivars.jpeg', height = 15, width = 20, units = 'cm', device = 'jpeg')
+
+
+
+#-------------------------------------------------------------#
+#Ensemble prediction ####
+#-------------------------------------------------------------#
+
+source('code/utilities/ensemble_prediction.R')
+source('code/utilities/load_fitting_result.R')
+
+# cka <- read.csv('data/weather_ready/cka_clean.csv') %>%
+#   filter(Year < 2022)
+# cieza <- read.csv('data/weather_ready/cieza_clean_patched.csv')
+# sfax <- read.csv('data/weather_ready/sfax_clean.csv')
+# meknes <- read.csv('data/weather_ready/meknes_clean.csv')
+# zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv') %>%
+#   filter(Year < 2022)
+# 
+# 
+# weather_list <- list('Klein-Altendorf' = cka,
+#                          'Cieza' = cieza,
+#                          'Zaragoza' = zaragoza,
+#                          'Sfax' = sfax,
+#                          'Meknes' = meknes)
+# 
+# stations <- read.csv('data/weather_ready/weather_station_phenological_observations.csv')
+# 
+# hourly_weather_list <- purrr::map(names(weather_list), function(x){
+# 
+#   weather_list[[x]] %>%
+#     chillR::stack_hourly_temps(latitude = stations$latitude[stations$station_name == x]) %>%
+#     purrr::pluck('hourtemps') %>%
+#     chillR::genSeasonList(years = (min(weather_list[[x]]$Year) + 1): max(weather_list[[x]]$Year)) %>%
+#     set_names((min(weather_list[[x]]$Year) + 1): max(weather_list[[x]]$Year))
+# 
+# 
+# })
+# 
+# names(hourly_weather_list) <- names(weather_list)
+# 
+# rm(weather_list, cka, cieza, sfax, meknes, zaragoza)
+# 
+# apricot_fit <- apple_fit <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <- almond_fit_old <-  list()
+# 
+# for(i in 1:10){
+#   apricot_fit[[i]] <- load_fitting_result('data/fitting/apricot/repeated_fitting_clean/', prefix = paste0('repeat', i, '_'))
+#   eplum_fit[[i]] <- load_fitting_result('data/fitting/european_plum/', prefix = paste0('repeat', i, '_'))
+#   jplum_fit[[i]] <- load_fitting_result('data/fitting/japanese_plum/', prefix = paste0('repeat', i, '_'))
+#   pistachio_fit[[i]] <- load_fitting_result('data/fitting/pistachio/', prefix = paste0('repeat', i, '_'))
+#   cherry_fit[[i]] <- load_fitting_result('data/fitting/sweet_cherry/repeated_fitting/', prefix = paste0('repeat', i, '_'))
+#   almond_fit_old[[i]]  <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting/', prefix = paste0('repeat', i, '_'))
+#   almond_fit[[i]] <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting_new_bounds', prefix = paste0('repeat', i, '_'))
+#   pear_fit[[i]] <- load_fitting_result('data/fitting/pear/', prefix = paste0('repeat', i, '_'))
+#   apple_fit[[i]] <- load_fitting_result('data/fitting/apple/', prefix = paste0('repeat', i, '_'))
+# }
+# 
+# fit_list <- list('Apricot' = apricot_fit,
+#                  'Apple' = apple_fit,
+#                  'European Plum' = eplum_fit,
+#                  'Japanese Plum' = jplum_fit,
+#                  'Pistachio' = pistachio_fit,
+#                  'Sweet Cherry' = cherry_fit,
+#                  'Almond' = almond_fit_old,
+#                  'Pear' = pear_fit)
+# 
+# 
+# 
+# ensemble_prediction <- purrr::map2(fit_list, names(fit_list), function(spec, spec_name){
+# 
+#   # spec <- fit_list[[6]]
+#   # spec_name <- names(fit_list)[6]
+# 
+# 
+#   cultivars <- names(spec[[1]])
+# 
+#   purrr::map(cultivars, function(cult_name){
+# 
+#     #cult_name <- cultivars[27]
+# 
+#     #extratc the cultivars parameter data
+#     par <- purrr::map(spec, cult_name)
+# 
+#     confidence <- performance %>%
+#       filter(cultivar == cult_name,
+#              species == spec_name,
+#              split == 'Validation') %>%
+#       pull(rpiq_adj)
+# 
+#     purrr::map2(hourly_weather_list, names(hourly_weather_list), function(weather, loc){
+#       out <- pheno_ensemble_prediction(par, confidence, temp = weather)
+# 
+#       data.frame(pred = out$predicted, sd = out$sd, species = spec_name,
+#                  cultivar = cult_name, location = loc, year = names(weather))
+#     }) %>%
+#       bind_rows()
+# 
+# 
+#   }) %>%
+#     bind_rows()
+# 
+# }, .progress = TRUE) %>%
+#   bind_rows()
+# 
+# write.csv(ensemble_prediction, 'data/projected_bloomdates_ensemble_observed_weather.csv', row.names = FALSE)
+
+ensemble_prediction <- read.csv('data/projected_bloomdates_ensemble_observed_weather.csv')
+str(ensemble_prediction)
+
+enesmble_prediction_observed <- prediction_df %>% 
+  mutate(year = as.character(year)) %>% 
+  merge.data.frame(ensemble_prediction, by = c('species', 'cultivar', 'location', 'year'), 
+                   all.x =  TRUE) %>% 
+  rename(pred_ensemble = pred.y, pred_single = pred.x) %>% 
+  filter(repetition == 1)
+
+performance_ensemble <- enesmble_prediction_observed %>% 
+  group_by(species) %>% 
+  summarise(RMSE = round(chillR::RMSEP(pred_ensemble, pheno, na.rm = TRUE),1),
+            RPIQ = round(chillR::RPIQ(pred_ensemble, pheno, na.rm = TRUE),1),
+            mean_bias = round(mean(pheno - pred_ensemble, na.rm  = TRUE)), 1)
+
+enesmble_prediction_observed %>% 
+  ggplot(aes(x = pheno, y = pred_ensemble)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
+  geom_abline(slope = 1) +
+  facet_wrap(~species, ncol = 4)+
+  ylab('Predicted Bloom Date') +
+  xlab('Observed Bloom Date') +
+  geom_text(data = performance_ensemble,  y = 150, x = 1, 
+            aes(label = paste('RMSE:', format(RMSE, nsmall = 1))), hjust = 0) +
+  geom_text(data = performance_ensemble,  y = 140, x = 1, 
+            aes(label = paste('RPIQ:', format(RPIQ, nsmall = 1))), hjust = 0) +
+  geom_text(data = performance_ensemble,  y = 130, x = 1, 
+            aes(label = paste('Mean Bias:', format(mean_bias, nsmall = 1))), hjust = 0) +
+  scale_x_continuous(limits = c(0, 152),
+                     breaks = c(1, 32, 60,91, 121, 152), 
+                     labels = c('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun')) +
+  scale_y_continuous(limits = c(0, 152),
+                     breaks = c(1, 32, 60,91, 121, 152), 
+                     labels = c('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun')) +
+  theme_bw(base_size = 15) 
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggsave('figures/paper/ensemble_prediction_performance.jpeg', height = 15, width = 25,
+       units = 'cm', device = 'jpeg')
+
+
+
+
+#--------------------------------------------------------------#
+# Time Windows Comparison of Methods####
+#--------------------------------------------------------------#
 
 #make the plot of the window comparison
 #draw empty plot with the empirical time windows
@@ -86,7 +289,7 @@ adamedor <- read.csv('data/combined_phenological_data_adamedor_clean.csv') %>%
          !(species == 'Apricot' & location == 'Cieza' & cultivar == 'Sublime' & year == 2014))
 
 sub <- adamedor %>% 
-  filter(species != 'Olive', location != 'Santomera') %>% 
+  filter(species != 'Olive') %>% 
   group_by(species, cultivar) %>% 
   summarise(n = n()) %>% 
   filter(n >= 20)
@@ -96,13 +299,13 @@ sub %>%
   summarise(n = length(unique(cultivar)))
 
 
-sub_per_loc <- adamedor %>% 
-  filter(cultivar %in% unique(sub$cultivar)) %>% 
-  group_by(cultivar, species, location) %>% 
-  summarise(min_year = min(year),
-            max_year = max(year),
-            n = n())
-write.csv(sub_per_loc, 'data/summary_table_cultivars.csv', row.names = FALSE)
+# sub_per_loc <- adamedor %>% 
+#   filter(cultivar %in% unique(sub$cultivar)) %>% 
+#   group_by(cultivar, species, location) %>% 
+#   summarise(min_year = min(year),
+#             max_year = max(year),
+#             n = n())
+# write.csv(sub_per_loc, 'data/summary_table_cultivars.csv', row.names = FALSE)
 
 flower_summarized <- adamedor %>% 
   group_by(species, location) %>% 
@@ -125,9 +328,9 @@ flower_summarized <- adamedor %>%
                           `Japanese plum` = "Japanese Plum") ) %>% 
   mutate(upper = mean + max_dist,
          lower = mean - max_dist) %>% 
-  dplyr::filter(location %in% c('Sfax', 'Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf'),
+  dplyr::filter(location %in% c('Sfax', 'Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf', 'Santomera'),
                 !(species %in% c('Peach', 'Olive'))) %>% 
-  mutate(location = factor(location, levels = c('Cieza', 'Zaragoza', 'Meknes', 'Klein-Altendorf', 'Sfax'))) %>% 
+  mutate(location = factor(location, levels = c('Klein-Altendorf','Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))) %>% 
   na.omit()
 
 source('code/utilities/time_window_translation.R')
@@ -165,13 +368,15 @@ sfax <- read.csv('data/weather_ready/sfax_clean.csv')
 meknes <- read.csv('data/weather_ready/meknes_clean.csv')
 zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv') %>% 
   filter(Year < 2022)
+santomera <- read.csv('data/weather_ready/murcia_clean.csv')
 
 
 weather_list_obs <- list('Klein-Altendorf' = cka,
                          'Cieza' = cieza,
                          'Zaragoza' = zaragoza,
                          'Sfax' = sfax,
-                         'Meknes' = meknes)
+                         'Meknes' = meknes,
+                         'Santomera' = santomera)
 weather_list_pred <- weather_list_obs
 
 
@@ -194,12 +399,483 @@ observation_df <- adamedor %>%
 source('code/utilities/get_thermal_timewindow.R')
 
 thermal_window <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
-                                                                                                                weather_list_pred = weather_list_obs, 
-                                                                                                                observation_df = observation_df, 
-                                                                                                                frost_threshold = frost_threshold, 
-                                                                                                                heat_threshold = heat_threshold, 
-                                                                                                                target_col_obs = x)) %>% 
-  bind_rows()
+                                                                                                                  weather_list_pred = weather_list_obs, 
+                                                                                                                  observation_df = observation_df, 
+                                                                                                                  frost_threshold = frost_threshold, 
+                                                                                                                  heat_threshold = heat_threshold, 
+                                                                                                                  target_col_obs = x,
+                                                                                                                  padding = 0.05)) %>% 
+  bind_rows() %>% 
+  mutate(padding = 0.05)
+
+
+
+#redid the anaylsis with some extra tolerance
+window_df <- thermal_window %>% 
+  mutate(flowering_type = recode(flowering_type, f5 = 'begin_flowering_f5', f50 = 'flowering_f50'),
+         lower =  min_doy_padded,
+         upper = max_doy_padded,
+         method = 'frost / heat risk',
+         species = tolower(species)) %>% 
+  dplyr::select(location, species, flowering_type, method, lower, upper)
+
+window_df <- timewindow_df %>% 
+  mutate(method = 'transfer empirical windows',
+         species = tolower(species)) %>% 
+  dplyr::select(location, species, flowering_type, method, lower, upper) %>% 
+  rbind(window_df)
+
+
+
+window_df %>% 
+  mutate(loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))),
+         species = stringr::str_to_title(species),
+         flowering_label = recode(flowering_type, begin_flowering_f5 = '10% Flowering',
+                                  flowering_f50 = '50% Flowering'),
+         method_label = recode(method, `frost / heat risk` = 'Thermal Risk', 
+                               `transfer empirical windows` = 'Transfer Ranges'),
+         species_label = recode(species, 
+                                `European Plum` = 'Europ. Plum',
+                                `Japanese Plum` = 'Jap. Plum')) %>% 
+  ggplot(aes(x = loc, fill = method_label)) +
+  geom_rect(aes(ymin = lower, ymax = upper, xmin = loc- 0.2, xmax = loc + 0.2), position = position_dodge()) +
+  scale_x_continuous(breaks = 1:6, labels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')) +
+  scale_y_continuous(breaks= c(-31, 0, 32, 60, 91, 121, 152, 182, 213), 
+                     minor_breaks = c(-15, 15, 46, 74, 105, 135, 166, 194), 
+                     labels = c('Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug')) +
+  scale_fill_manual(values = c("steelblue", "#E69F00"), name = 'Flowering Window Method') +
+  ylab('Month') +
+  xlab('Location') +
+  facet_grid(flowering_label~species_label) +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom')
+ggsave('figures/paper/example_timewindow.jpeg', height = 20, width = 27, units = 'cm', device = 'jpeg')
+
+
+
+
+
+#---------------------------------------------------------#
+# Visualize the frost and heat risk calculation
+#---------------------------------------------------------#
+
+
+#species to do the analysis for
+species <- unique(observation_df$species)
+
+
+#check if DATE is present, if so make it to Date
+weather_list_obs <- purrr::map(weather_list_obs, function(x){
+  if('date' %in% tolower(colnames(x)) & ('Date' %in% colnames(x)) == FALSE){
+    
+    #find out which version is present
+    i <- which(tolower(colnames(x)) == 'date')[1]
+    
+    
+    x$Date <- x[,i]
+    
+    return(x)
+  } else if('date' %in% tolower(colnames(x)) == FALSE){
+    stop('weather_list_obs does not contain a column which is called "Date", "DATE" or written in a different case. All weather data need a date column for the function to work')
+  } else { 
+    return(x)}
+})
+
+#check if DATE is present, if so make it to Date
+weather_list_pred <- purrr::map(weather_list_pred, function(x){
+  if('date' %in% tolower(colnames(x)) & ('Date' %in% colnames(x)) == FALSE){
+    
+    #find out which version is present
+    i <- which(tolower(colnames(x)) == 'date')[1]
+    
+    
+    x$Date <- x[,i]
+    
+    return(x)
+  } else if('date' %in% tolower(colnames(x)) == FALSE){
+    stop('weather_list_obs does not contain a column which is called "Date", "DATE" or written in a different case. All weather data need a date column for the function to work')
+  } else { 
+    return(x)}
+})
+
+
+target_col_obs <- 'flowering_f50'
+
+#get frost and heat risk for each day of the year
+frost_risk <- purrr::map(weather_list_obs, function(x){
+  x %>% 
+    mutate(doy = lubridate::yday(Date)) %>% 
+    group_by(doy) %>% 
+    summarise(chance_frost = sum(Tmin <= frost_threshold) / n()) %>% 
+    mutate(run_mean_frost = chillR::runn_mean(chance_frost, runn_mean = run_mean_window))
+}) %>% 
+  bind_rows(.id = 'location') %>% 
+  tidyr::expand_grid(species = species)
+
+
+#heat risk for each day of the year
+heat_risk <- purrr::map(weather_list_obs, function(x){
+  x %>% 
+    mutate(doy = lubridate::yday(Date)) %>% 
+    group_by(doy) %>% 
+    summarise(chance_heat = sum(Tmax >= heat_threshold) / n()) %>% 
+    mutate(run_mean_heat = chillR::runn_mean(chance_heat, runn_mean = run_mean_window))
+}) %>% 
+  bind_rows(.id = 'location') %>% 
+  tidyr::expand_grid(species = species)
+
+
+#save the target column in a different column, which I can access by name
+observation_df$target_pheno <- observation_df[, target_col_obs]
+
+
+#summarize the phenology data, know for each day of the year how many flowering records were measured for each species and location
+flower_sum <- observation_df %>% 
+  mutate(doy_pheno = lubridate::yday(target_pheno)) %>% 
+  group_by(species, location, doy_pheno) %>% 
+  summarise(n_flower = n())
+
+
+
+max_frost <- observation_df %>%
+  mutate(doy_pheno = lubridate::yday(target_pheno)) %>%
+  dplyr::select(species, location, cultivar, flowering_f50, doy_pheno) %>%
+  merge.data.frame(frost_risk, by.x = c('species', 'location', 'doy_pheno'), by.y = c('species', 'location', 'doy'), all = TRUE) %>%
+  na.omit() %>%
+  group_by(species) %>%
+  summarise(max_risk_frost = max(run_mean_frost))
+
+max_heat <- observation_df %>%
+  mutate(doy_pheno = lubridate::yday(target_pheno)) %>%
+  dplyr::select(species, location, cultivar, flowering_f50, doy_pheno) %>%
+  merge.data.frame(heat_risk, by.x = c('species', 'location', 'doy_pheno'), by.y = c('species', 'location', 'doy'), all = TRUE) %>%
+  na.omit() %>%
+  group_by(species) %>%
+  summarise(max_risk_heat = max(run_mean_heat))
+
+observation_df$target_doy <- lubridate::yday(observation_df$target_pheno)
+
+
+
+frost_risk %>% 
+  #merge(by.x  = c('species', 'location', 'doy'), by.y  = c('species', 'location', 'doy_pheno'), all.x = TRUE) %>% 
+  ggplot(aes(x = doy, y = run_mean_frost, col = location)) +
+  geom_line() +
+  geom_point(data = merge.data.frame(flower_sum, frost_risk, by.y  = c('species', 'location', 'doy'), by.x  = c('species', 'location', 'doy_pheno'), all.x = TRUE), 
+             aes(x = doy_pheno))+
+  geom_hline(data = max_frost, aes(yintercept = max_risk_frost), linetype = 'dashed') +
+  geom_hline(data = max_frost, aes(yintercept = max_risk_frost + 0.05)) +
+  scale_color_discrete(breaks = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')) +
+  facet_wrap(~species, ncol = 4) +
+  coord_cartesian(xlim = c(0, 170)) +
+  scale_x_continuous(breaks= c(0, 32, 60, 91, 121, 152), 
+                     #minor_breaks = c(15, 46, 74, 105, 135), 
+                     labels = c('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun')) +
+  xlab('')+
+  ylab('Risk to get temperature < 0\u00b0C') +
+  theme_bw(base_size = 15)
+ggsave('figures/frost_risk_for_timewindow.jpeg', height = 20, width = 30, units = 'cm', device = 'jpeg')
+
+heat_risk %>% 
+  #merge(by.x  = c('species', 'location', 'doy'), by.y  = c('species', 'location', 'doy_pheno'), all.x = TRUE) %>% 
+  ggplot(aes(x = doy, y = run_mean_heat, col = location)) +
+  geom_line() +
+  geom_point(data = merge.data.frame(flower_sum, heat_risk, by.y  = c('species', 'location', 'doy'), by.x  = c('species', 'location', 'doy_pheno'), all.x = TRUE), 
+             aes(x = doy_pheno))+
+  geom_hline(data = max_heat, aes(yintercept = max_risk_heat), linetype = 'dashed') +
+  geom_hline(data = max_heat, aes(yintercept = max_risk_heat + 0.05)) +
+  scale_color_discrete(breaks = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')) +
+  coord_cartesian(xlim = c(0, 170)) +
+  scale_x_continuous(breaks= c(0, 32, 60, 91, 121, 152), 
+                     #minor_breaks = c(15, 46, 74, 105, 135), 
+                     labels = c('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun')) +
+  facet_wrap(~species, ncol = 4) +
+  xlab('')+
+  ylab('Risk to get temperature > 32\u00b0C') +
+  theme_bw(base_size = 15)
+ggsave('figures/heat_risk_for_timewindow.jpeg', height = 20, width = 30, units = 'cm', device = 'jpeg')
+
+
+
+
+#--------------------------------------------------------------#
+# Thermal Risk: Padding ####
+#--------------------------------------------------------------#
+
+#make the plot of the window comparison
+#draw empty plot with the empirical time windows
+
+
+rm(list = ls())
+
+adamedor <- read.csv('data/combined_phenological_data_adamedor_clean.csv') %>% 
+  filter(!(species == 'Apple' & location == 'Klein-Altendorf' & cultivar == 'Elstar' & year %in% c(2008, 2010)),
+         !(species == 'Apricot' & location == 'Cieza' & cultivar == 'Sublime' & year == 2014))
+
+sub <- adamedor %>% 
+  filter(species != 'Olive') %>% 
+  group_by(species, cultivar) %>% 
+  summarise(n = n()) %>% 
+  filter(n >= 20)
+
+sub %>% 
+  group_by(species) %>% 
+  summarise(n = length(unique(cultivar)))
+
+
+# sub_per_loc <- adamedor %>% 
+#   filter(cultivar %in% unique(sub$cultivar)) %>% 
+#   group_by(cultivar, species, location) %>% 
+#   summarise(min_year = min(year),
+#             max_year = max(year),
+#             n = n())
+# write.csv(sub_per_loc, 'data/summary_table_cultivars.csv', row.names = FALSE)
+
+flower_summarized <- adamedor %>% 
+  group_by(species, location) %>% 
+  mutate(begin_flowering_f5 = lubridate::yday(begin_flowering_f5), 
+         flowering_f50 = lubridate::yday(flowering_f50)) %>% 
+  summarize(mean.begin_flowering_f5 = mean(begin_flowering_f5, na.rm = TRUE),
+            sd.begin_flowering_f5 = sd(begin_flowering_f5, na.rm = TRUE),
+            max_dist.begin_flowering_f5 = max(abs(begin_flowering_f5 - mean(begin_flowering_f5, na.rm = TRUE)), na.rm = TRUE) * 1.5,
+            mean.flowering_f50 = mean(flowering_f50, na.rm = TRUE),
+            sd.flowering_f50 = sd(flowering_f50, na.rm = TRUE),
+            max_dist.flowering_f50 = max(abs(flowering_f50 - mean(flowering_f50, na.rm = TRUE)), na.rm = TRUE) * 1.5) %>% 
+  reshape2::melt(id.vars = c('species', 'location')) %>% 
+  mutate(value = replace(value, value %in% c(NaN, NA, -Inf), NA)) %>% 
+  separate(col = variable, into = c('variable', 'flowering_type'), sep = '\\.') %>% 
+  reshape2::dcast(species + location + flowering_type ~ variable, value.var = 'value') %>% 
+  relocate(species, location, flowering_type, mean, sd, max_dist) %>% 
+  mutate(location = as.factor(location),
+         species = recode(species, 
+                          `European plum` = "European Plum", 
+                          `Japanese plum` = "Japanese Plum") ) %>% 
+  mutate(upper = mean + max_dist,
+         lower = mean - max_dist) %>% 
+  dplyr::filter(location %in% c('Sfax', 'Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf', 'Santomera'),
+                !(species %in% c('Peach', 'Olive'))) %>% 
+  mutate(location = factor(location, levels = c('Klein-Altendorf','Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))) %>% 
+  na.omit()
+
+source('code/utilities/time_window_translation.R')
+
+f_mean <- est_phen_gaps(target_df = flower_summarized, target_col = 'mean', split_col = 'flowering_type')
+f_sd <- est_phen_gaps(target_df = flower_summarized, target_col = 'sd', split_col = 'flowering_type')
+f_lower <- est_phen_gaps(target_df = flower_summarized, target_col = 'lower', split_col = 'flowering_type')
+f_upper <- est_phen_gaps(target_df = flower_summarized, target_col = 'upper', split_col = 'flowering_type')
+
+
+#maybe take median and then look how the time windows would be
+
+f_lower_sum <- f_lower %>% 
+  group_by(species, location, flowering_type, source) %>% 
+  summarise(lower = median(value),
+            lower_plus = quantile(value, 0.25, na.rm = TRUE))
+
+f_upper_sum <- f_upper %>% 
+  group_by(species, location, flowering_type, source) %>% 
+  summarise(upper = median(value),
+            upper_plus = quantile(value, 0.75, na.rm = TRUE))
+
+timewindow_df <- merge.data.frame(f_lower_sum, f_upper_sum, by = c('species', 'location', 'flowering_type', 'source'))
+
+
+stations <-  read.csv('data/weather_ready/weather_station_phenological_observations.csv')
+
+
+
+#make predictions for the actual weather data
+cka <- read.csv('data/weather_ready/cka_clean.csv') %>% 
+  filter(Year < 2022)
+cieza <- read.csv('data/weather_ready/cieza_clean_patched.csv')
+sfax <- read.csv('data/weather_ready/sfax_clean.csv')
+meknes <- read.csv('data/weather_ready/meknes_clean.csv')
+zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv') %>% 
+  filter(Year < 2022)
+santomera <- read.csv('data/weather_ready/murcia_clean.csv')
+
+
+weather_list_obs <- list('Klein-Altendorf' = cka,
+                         'Cieza' = cieza,
+                         'Zaragoza' = zaragoza,
+                         'Sfax' = sfax,
+                         'Meknes' = meknes,
+                         'Santomera' = santomera)
+weather_list_pred <- weather_list_obs
+
+
+#numbers for table 1
+# purrr::map(weather_list_pred, function(x){
+#   x %>% 
+#     filter(Year >= 1990, Year <= 2020) %>% 
+#     summarise(mean_Tmin = mean(Tmin),
+#               mean_Tmax = mean(Tmax))
+# })
+
+
+
+frost_threshold <- 0
+heat_threshold <- 32
+observation_df <- adamedor %>% 
+  filter(!(species %in% c( 'Peach', 'Olive')))
+
+
+source('code/utilities/get_thermal_timewindow.R')
+
+thermal_window_0 <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
+                                                                                                                  weather_list_pred = weather_list_obs, 
+                                                                                                                  observation_df = observation_df, 
+                                                                                                                  frost_threshold = frost_threshold, 
+                                                                                                                  heat_threshold = heat_threshold, 
+                                                                                                                  target_col_obs = x,
+                                                                                                                  padding = 0.0)) %>% 
+  bind_rows() %>% 
+  mutate(padding = 0.0)
+
+thermal_window_2 <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
+                                                                                                                  weather_list_pred = weather_list_obs, 
+                                                                                                                  observation_df = observation_df, 
+                                                                                                                  frost_threshold = frost_threshold, 
+                                                                                                                  heat_threshold = heat_threshold, 
+                                                                                                                  target_col_obs = x,
+                                                                                                                  padding = 0.02)) %>% 
+  bind_rows() %>% 
+  mutate(padding = 0.02)
+
+thermal_window_5 <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
+                                                                                                                  weather_list_pred = weather_list_obs, 
+                                                                                                                  observation_df = observation_df, 
+                                                                                                                  frost_threshold = frost_threshold, 
+                                                                                                                  heat_threshold = heat_threshold, 
+                                                                                                                  target_col_obs = x,
+                                                                                                                  padding = 0.05)) %>% 
+  bind_rows() %>% 
+  mutate(padding = 0.05)
+
+thermal_window_10 <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
+                                                                                                                   weather_list_pred = weather_list_obs, 
+                                                                                                                   observation_df = observation_df, 
+                                                                                                                   frost_threshold = frost_threshold, 
+                                                                                                                   heat_threshold = heat_threshold, 
+                                                                                                                   target_col_obs = x,
+                                                                                                                   padding = 0.1)) %>% 
+  bind_rows() %>% 
+  mutate(padding = 0.1)
+
+
+
+window_df <- thermal_window_0 %>%
+  rbind(thermal_window_2) %>% 
+  rbind(thermal_window_5) %>% 
+  rbind(thermal_window_10) %>% 
+  mutate(flowering_type = recode(flowering_type, f5 = 'begin_flowering_f5', f50 = 'flowering_f50'),
+         lower =  min_doy_padded,
+         upper = max_doy_padded,
+         method = 'frost / heat risk',
+         species = tolower(species)) %>% 
+  dplyr::select(location, species, flowering_type, method, lower, upper, padding)
+
+
+
+window_df %>% 
+  mutate(loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))),
+         species = stringr::str_to_title(species),
+         flowering_label = recode(flowering_type, begin_flowering_f5 = '10% Flowering',
+                                  flowering_f50 = '50% Flowering'),
+         method_label = recode(method, `frost / heat risk` = 'Thermal Risk', 
+                               `transfer empirical windows` = 'Transfer Ranges'),
+         species_label = recode(species, 
+                                `European Plum` = 'Europ. Plum',
+                                `Japanese Plum` = 'Jap. Plum')) %>% 
+  ggplot(aes(x = loc, fill = as.factor(padding))) +
+  geom_rect(aes(ymin = lower, ymax = upper, xmin = loc- 0.2, xmax = loc + 0.2), position = position_dodge()) +
+  scale_x_continuous(breaks = 1:6, labels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')) +
+  scale_y_continuous(breaks= c(-31, 0, 32, 60, 91, 121, 152, 182, 213), 
+                     minor_breaks = c(-15, 15, 46, 74, 105, 135, 166, 194), 
+                     labels = c('Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug')) +
+  #scale_fill_manual(values = c("steelblue", "#E69F00"), name = 'Flowering Window Method') +
+  ylab('Month') +
+  xlab('Location') +
+  facet_grid(flowering_label~species_label) +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom')
+
+
+
+
+
+pheno_current <- read.csv('data/projected_bloomdates_ensemble_observed_weather.csv') %>% 
+  mutate(species = tolower(species),
+         pheno_predicted = pred,
+         flowering_type = ifelse(species %in% c('apple', 'almond', 'european plum', 'japanese plum'), yes = 'begin_flowering_f5', no = 'flowering_f50'))
+
+
+
+fail_ther_current <- pheno_current %>% 
+  merge.data.frame(window_df, by = c('species', 'location', 'flowering_type')) %>% 
+  group_by(location, species, cultivar, padding) %>% 
+  summarise(failure_rate = sum(pheno_predicted < lower | pheno_predicted > upper) / n(),
+            dist_window = min(c(abs(pheno_predicted - lower), abs(pheno_predicted - upper))),
+            too_early = sum(pheno_predicted < lower) / n(),
+            too_late = sum(pheno_predicted > upper) / n(),
+            window_type = 'thermal')
+
+
+p1 <- fail_ther_current %>% 
+  mutate(species = stringr::str_to_title(species),
+         species_label = recode(species, `European Plum` = 'a',
+                                `Japanese Plum` = 'b',
+                                Pistachio = 'c'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'a', 'b', 'Pear', 'c', 'Sweet Cherry')),
+         location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
+                           Zaragoza = 'Zarag.')) %>% 
+  filter(species %in% c('Almond', 'Apple', 'Apricot')) %>% 
+  ggplot(aes(x = failure_rate, y = cultivar, fill = factor(padding))) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species_label~location, scales = 'free_y', space = 'free_y') +
+  scale_y_discrete(limits=rev) +
+  theme_bw(base_size = 15) +
+  ylab('Cultivar') +
+  xlab('Share of Predicted Flowering Outside Time Window') +
+  scale_x_continuous(breaks = c(0, 0.5, 1.0)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom') 
+#scale_fill_manual(values = c("steelblue", "#E69F00"), breaks = c('thermal', 'sudoku'), labels = c('Thermal Risk', 'Transfer Ranges'))+
+#theme(legend.title = 'Method to construct\ntime window') +
+#guides(fill=guide_legend(title="Flowering Window Method"))
+p1
+
+p2 <- fail_ther_current %>% 
+  mutate(species = stringr::str_to_title(species),
+         species_label = recode(species, `European Plum` = 'a',
+                                `Japanese Plum` = 'b',
+                                Pistachio = 'c'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'a', 'b', 'Pear', 'c', 'Sweet Cherry')),
+         location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
+                           Zaragoza = 'Zarag.')) %>% 
+  filter(!(species %in% c('Almond', 'Apple', 'Apricot'))) %>% 
+  ggplot(aes(x = failure_rate, y = cultivar, fill = factor(padding))) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species_label~location, scales = 'free_y', space = 'free_y') +
+  scale_y_discrete(limits=rev) +
+  theme_bw(base_size = 15) +
+  ylab('Cultivar') +
+  xlab('Share of Predicted Flowering Outside Time Window') +
+  scale_x_continuous(breaks = c(0, 0.5, 1.0)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom') 
+p2
+#padding by 2% did not solve the problem.........
+
+
+p1 + p2 + plot_layout(guides = 'collect') & theme(legend.position= 'bottom') 
+ggsave('figures/paper/failure_rate_current.jpeg', device = 'jpeg',
+       height = 25, width = 30, units = 'cm')
+
+
+
+
+#look how the missclassifications change with different padding
+
+
 
 
 
@@ -251,6 +927,8 @@ window_df %>%
   theme_bw(base_size = 15) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom')
 ggsave('figures/paper/example_timewindow.jpeg', height = 20, width = 27, units = 'cm', device = 'jpeg')
+
+
 
 
 
@@ -747,38 +1425,213 @@ ggplot2::ggsave('figures/paper/change_bloomdate_thermal_v2.jpeg', device = 'jpeg
 # Failure rates ####
 #----------------------------------------------------------#
 
-pheno_current <-  read.csv('data/projected_bloomdates_ensemble_observed_weather.csv') %>% 
-  mutate(species = tolower(species)) 
+rm(list = ls())
 
-thermal_window <- thermal_window %>% 
+adamedor <- read.csv('data/combined_phenological_data_adamedor_clean.csv') %>% 
+  filter(!(species == 'Apple' & location == 'Klein-Altendorf' & cultivar == 'Elstar' & year %in% c(2008, 2010)),
+         !(species == 'Apricot' & location == 'Cieza' & cultivar == 'Sublime' & year == 2014))
+
+
+flower_summarized <- adamedor %>% 
+  group_by(species, location) %>% 
+  mutate(begin_flowering_f5 = lubridate::yday(begin_flowering_f5), 
+         flowering_f50 = lubridate::yday(flowering_f50)) %>% 
+  summarize(mean.begin_flowering_f5 = mean(begin_flowering_f5, na.rm = TRUE),
+            sd.begin_flowering_f5 = sd(begin_flowering_f5, na.rm = TRUE),
+            max_dist.begin_flowering_f5 = max(abs(begin_flowering_f5 - mean(begin_flowering_f5, na.rm = TRUE)), na.rm = TRUE) * 1.5,
+            mean.flowering_f50 = mean(flowering_f50, na.rm = TRUE),
+            sd.flowering_f50 = sd(flowering_f50, na.rm = TRUE),
+            max_dist.flowering_f50 = max(abs(flowering_f50 - mean(flowering_f50, na.rm = TRUE)), na.rm = TRUE) * 1.5) %>% 
+  reshape2::melt(id.vars = c('species', 'location')) %>% 
+  mutate(value = replace(value, value %in% c(NaN, NA, -Inf), NA)) %>% 
+  separate(col = variable, into = c('variable', 'flowering_type'), sep = '\\.') %>% 
+  reshape2::dcast(species + location + flowering_type ~ variable, value.var = 'value') %>% 
+  relocate(species, location, flowering_type, mean, sd, max_dist) %>% 
+  mutate(location = as.factor(location),
+         species = recode(species, 
+                          `European plum` = "European Plum", 
+                          `Japanese plum` = "Japanese Plum") ) %>% 
+  mutate(upper = mean + max_dist,
+         lower = mean - max_dist) %>% 
+  dplyr::filter(location %in% c('Sfax', 'Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf', 'Santomera'),
+                !(species %in% c('Peach', 'Olive'))) %>% 
+  mutate(location = factor(location, levels = c('Klein-Altendorf','Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))) %>% 
+  na.omit()
+
+source('code/utilities/time_window_translation.R')
+
+f_lower <- est_phen_gaps(target_df = flower_summarized, target_col = 'lower', split_col = 'flowering_type')
+f_upper <- est_phen_gaps(target_df = flower_summarized, target_col = 'upper', split_col = 'flowering_type')
+
+
+#maybe take median and then look how the time windows would be
+
+f_lower_sum <- f_lower %>% 
+  group_by(species, location, flowering_type, source) %>% 
+  summarise(lower = median(value),
+            lower_plus = quantile(value, 0.25, na.rm = TRUE))
+
+f_upper_sum <- f_upper %>% 
+  group_by(species, location, flowering_type, source) %>% 
+  summarise(upper = median(value),
+            upper_plus = quantile(value, 0.75, na.rm = TRUE))
+
+sudoku_timewindow <- merge(f_lower_sum, f_upper_sum, 
+                           by = c('species', 'location', 'flowering_type', 'source')) %>% 
+  mutate(species = tolower(species),
+         min_doy = lower,
+         max_doy = upper) %>% 
+  dplyr::select(species, location, flowering_type, min_doy, max_doy)
+
+
+stations <-  read.csv('data/weather_ready/weather_station_phenological_observations.csv')
+
+
+
+#make predictions for the actual weather data
+cka <- read.csv('data/weather_ready/cka_clean.csv') %>% 
+  filter(Year < 2022)
+cieza <- read.csv('data/weather_ready/cieza_clean_patched.csv')
+sfax <- read.csv('data/weather_ready/sfax_clean.csv')
+meknes <- read.csv('data/weather_ready/meknes_clean.csv')
+zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv') %>% 
+  filter(Year < 2022)
+santomera <- read.csv('data/weather_ready/murcia_clean.csv')
+
+
+weather_list_obs <- list('Klein-Altendorf' = cka,
+                         'Cieza' = cieza,
+                         'Zaragoza' = zaragoza,
+                         'Sfax' = sfax,
+                         'Meknes' = meknes,
+                         'Santomera' = santomera)
+weather_list_pred <- weather_list_obs
+
+
+
+#numbers for table 1
+# purrr::map(weather_list_pred, function(x){
+#   x %>% 
+#     filter(Year >= 1990, Year <= 2020) %>% 
+#     summarise(mean_Tmin = mean(Tmin),
+#               mean_Tmax = mean(Tmax))
+# })
+
+
+
+frost_threshold <- 0
+heat_threshold <- 32
+observation_df <- adamedor %>% 
+  filter(!(species %in% c( 'Peach', 'Olive')))
+
+
+source('code/utilities/get_thermal_timewindow.R')
+
+thermal_window <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
+                                                                                                                weather_list_pred = weather_list_obs, 
+                                                                                                                observation_df = observation_df, 
+                                                                                                                frost_threshold = frost_threshold, 
+                                                                                                                heat_threshold = heat_threshold, 
+                                                                                                                target_col_obs = x,
+                                                                                                                padding = 0.05)) %>% 
+  bind_rows() %>% 
   mutate(species = tolower(species))
 
 
+
+
+pheno_current <-  read.csv('data/projected_bloomdates_ensemble_observed_weather.csv') %>% 
+  mutate(species = tolower(species)) %>% 
+  mutate(flowering_type = ifelse(species %in% c('almond', 'apple', 'european plum', 'japanese plum'), 
+                                 yes = 'begin_flowering_f5', 
+                                 no = 'flowering_f50'))
+
+
+
 fail_su_current <- pheno_current %>% 
-  merge.data.frame(sudoku_timewindow, by = c('species', 'location', 'flowering_type')) %>% 
+  merge(sudoku_timewindow, by = c('species', 'location', 'flowering_type')) %>% 
   group_by(location, species, cultivar) %>% 
-  summarise(failure_rate = sum(pheno_predicted < min_doy | pheno_predicted > max_doy) / n(),
-            dist_window = min(c(abs(pheno_predicted - min_doy), abs(pheno_predicted - max_doy))),
-            too_early = sum(pheno_predicted < min_doy) / n(),
-            too_late = sum(pheno_predicted > max_doy) / n(),
+  summarise(failure_rate = sum(pred < min_doy | pred > max_doy) / n(),
+            dist_window = min(c(abs(pred - min_doy), abs(pred - max_doy))),
+            too_early = sum(pred < min_doy) / n(),
+            too_late = sum(pred > max_doy) / n(),
             window_type = 'sudoku')
 
 fail_ther_current <- pheno_current %>% 
-  merge.data.frame(thermal_window, by = c('species', 'location', 'flowering_type')) %>% 
+  merge(thermal_window, by = c('species', 'location', 'flowering_type')) %>% 
   group_by(location, species, cultivar) %>% 
-  summarise(failure_rate = sum(pheno_predicted < min_doy_padded | pheno_predicted > max_doy_padded) / n(),
-            dist_window = min(c(abs(pheno_predicted - min_doy_padded), abs(pheno_predicted - max_doy_padded))),
-            too_early = sum(pheno_predicted < min_doy_padded) / n(),
-            too_late = sum(pheno_predicted > max_doy_padded) / n(),
+  summarise(failure_rate = sum(pred < min_doy_padded | pred > max_doy_padded) / n(),
+            dist_window = min(c(abs(pred - min_doy_padded), abs(pred - max_doy_padded))),
+            too_early = sum(pred < min_doy_padded) / n(),
+            too_late = sum(pred > max_doy_padded) / n(),
             window_type = 'thermal')
+
+rm(pheno_current, cka, santomera, cieza, zaragoza, sfax, meknes, stations, flower_summarized, f_upper, f_sd, f_lower,
+   f_lower_sum, f_upper_sum, observation_df, weather_list_obs, weather_list_pred)
+
+#make type 1 error
+
+type2 <- fail_su_current %>% 
+  rbind(fail_ther_current) %>% 
+  mutate(species = stringr::str_to_title(species),
+         location_label = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
+                           Zaragoza = 'Zarag.')) %>% 
+  filter((species %in% c('Apricot', 'Apple', 'European Plum', 'Japanese Plum', 'Pear', 'Sweet Cherry') & location == 'Sfax') |
+         (species == 'Almond' & location %in% c('Klein-Altendorf', 'Zaragoza'))) %>% 
+  mutate(type_two_error = 1 - failure_rate,
+         location_label = factor(location_label, levels = c('Kl.-Alt.', 'Zarag.', 'Sfax'))) %>% 
+  ggplot(aes(y = type_two_error, x = species, fill = window_type)) +
+  geom_boxplot() +
+  facet_grid(~location_label, scales = 'free_x', space = 'free_x') +
+  theme_bw(base_size = 15) +
+  xlab('') +
+  ylab('Type II error') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  scale_fill_manual(values = c("steelblue", "#E69F00"), breaks = c('thermal', 'sudoku'), labels = c('Thermal Risk', 'Transfer Ranges'))+
+  #theme(legend.title = 'Method to construct\ntime window') +
+  guides(fill=guide_legend(title="Flowering Window Method"))
+
+type1 <- fail_su_current %>% 
+  rbind(fail_ther_current) %>% 
+  mutate(species = stringr::str_to_title(species),
+         location_label = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
+                                 Zaragoza = 'Zarag.'),
+         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Meknes', 'Sfax'))) %>% 
+  filter((location == 'Klein-Altendorf' & species %in% c('Apple', 'European Plum', 'Japanese Plum', 'Pear', 'Sweet Cherry')) |
+           (location == 'Cieza' & species %in% c('Apricot')) |
+           (location == 'Zaragoza' & species %in% c('Apricot', 'Sweet Cherry', 'Pear')) |
+           (location == 'Meknes' & species %in% c('Almond', 'Apple')) |
+           (location == 'Sfax' & species %in% c('Almond', 'Pistachio'))) %>% 
+  ggplot(aes(y = failure_rate, x = species, fill = window_type)) +
+  geom_boxplot() +
+  facet_grid(~location, scales = 'free_x', space = 'free_x') +
+  theme_bw(base_size = 15) +
+  xlab('') +
+  ylab('Type I error') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  scale_fill_manual(values = c("steelblue", "#E69F00"), breaks = c('thermal', 'sudoku'), labels = c('Thermal Risk', 'Transfer Ranges')) +
+  #theme(legend.title = 'Method to construct\ntime window') +
+  guides(fill=guide_legend(title="Flowering Window Method"))
+
+design <- 
+"
+AB
+"
+
+list(type1, type2) |>
+  wrap_plots() +
+  plot_layout(guides = 'collect', widths = c(1.5, 1), design = design) & theme(legend.position= 'bottom') & plot_annotation(tag_levels = 'A') 
+ggsave('figures/paper/error_types_timewindow.jpeg', height = 20, width = 30, units = 'cm', device = 'jpeg')
+
+
 
 p1 <- fail_su_current %>% 
   rbind(fail_ther_current) %>% 
   mutate(species = stringr::str_to_title(species),
-         species_label = recode(species, `European Plum` = 'a',
-                                `Japanese Plum` = 'b',
-                                Pistachio = 'c'),
-         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'a', 'b', 'Pear', 'c', 'Sweet Cherry')),
+         species_label = recode(species, `European Plum` = 'ep',
+                                `Japanese Plum` = 'jp',
+                                Pistachio = 'pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'jp', 'Pear', 'pi', 'Sweet Cherry')),
          location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
                            Zaragoza = 'Zarag.')) %>% 
   filter(species %in% c('Almond', 'Apple', 'Apricot')) %>% 
@@ -936,7 +1789,7 @@ cult_num_df <- fail_su_future %>%
   mutate(cult_num  =ncult:1)
 
 
-install.packages('ggh4x')
+#install.packages('ggh4x')
 
 p1 <- fail_su_future %>% 
   merge.data.frame(fail_su_hist, by = c('species', 'cultivar', 'location')) %>% 

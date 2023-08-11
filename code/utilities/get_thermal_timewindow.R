@@ -28,7 +28,7 @@ get_thermal_window_phenology <- function(weather_list_obs,
                                          heat_threshold,
                                          target_col_obs,
                                          run_mean_window = 10,
-                                         padding = 0.02){
+                                         padding = 0.05){
   
   
   #species to do the analysis for

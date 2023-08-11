@@ -10,21 +10,8 @@ library(LarsChill)
 
 ## Raw data
 stations <-
-  read.csv("data/combined_phenological_data_adamedor_clean.csv",
-           fileEncoding = "ISO-8859-1") %>%
-  as.data.frame() %>%
-  count(., species, cultivar) %>%
-  ungroup()
+  read.csv("data/weather_ready/weather_station_phenological_observations.csv") 
 ## Data filtered by Lars
-filtered <-
-  read.csv("data/overiew_pheno.csv", fileEncoding = "ISO-8859-1") %>%
-  as.data.frame()
-
-#Function to make ensemble predictions with the
-source('code/utilities/pheno_ensemble_prediction.R')
-#Function to load parameters for apricot
-source('code/utilities/load_save_fitting_results.R')
-
 
 ## Find the combinations of models, cities and years we have in our database
 #files<-list.files("./data/Future-sim-weather")
@@ -44,17 +31,6 @@ for (a in files) {
   List_models <- rbind.data.frame(List_models, Newrow)
 }
 
-### I couldnt find the sampling locations in the weather_stations_fernandez file
-### so I manually included them
-
-Lat <-
-  read.csv('data/weather_ready/weather_station_phenological_observations.csv')
-
-# Lat<-data.frame(
-#   Locations=c("Meknes","Sfax","Zaragoza"),
-#   Lat=c(33.870, 34.739, 41.666)
-# )
-
 #These two parameters are fixed for all the models
 Tc = 36
 theta_star = 279
@@ -67,7 +43,7 @@ performance_df <- read.csv('data/performance_fitted_models.csv')
 ########################################################
 
 ## Load all the fitting results from the 10 repetitions
-apricot_fit <- apple_fit <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <- almond_fit_old <-  list()
+apricot_fit <- apple_fit <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <-  list()
 
 for(i in 1:10){
   apricot_fit[[i]] <- load_fitting_result('data/fitting/apricot/repeated_fitting_clean/', prefix = paste0('repeat', i, '_'))
@@ -76,8 +52,9 @@ for(i in 1:10){
   jplum_fit[[i]] <- load_fitting_result('data/fitting/japanese_plum/', prefix = paste0('repeat', i, '_'))
   pistachio_fit[[i]] <- load_fitting_result('data/fitting/pistachio/', prefix = paste0('repeat', i, '_'))
   cherry_fit[[i]] <- load_fitting_result('data/fitting/sweet_cherry/repeated_fitting/', prefix = paste0('repeat', i, '_'))
-  almond_fit[[i]]  <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting/', prefix = paste0('repeat', i, '_'))
+  #almond_fit[[i]]  <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting/', prefix = paste0('repeat', i, '_'))
   #almond_fit[[i]] <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting_new_bounds', prefix = paste0('repeat', i, '_'))
+  almond_fit[[i]]  <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting_santomera_cleanly_saved/', prefix = paste0('repeat', i, '_'))
   pear_fit[[i]] <- load_fitting_result('data/fitting/pear/', prefix = paste0('repeat', i, '_'))
 }
 
@@ -149,16 +126,6 @@ wrapper_ensemble_predictions <- function(SeasonList, input_list, plot_progress =
   return(prediction)
 }
 
-season_org <- SeasonList
-
-SeasonList <- season_org[[1]]
-plot_progress = TRUE
-
-
-#now, make predictions for each cultivar and each species
-i <- 1
-
-future_weather_list_1st_half <- future_weather_list[1:100]
 
 #
 all_predictions <- purrr::map(1:length(future_weather_list), function(i){
@@ -167,7 +134,7 @@ all_predictions <- purrr::map(1:length(future_weather_list), function(i){
     str_split(pattern = '\\.') %>% 
     unlist()
   
-  lat <- Lat %>% 
+  lat <- stations %>% 
     filter(station_name == split_name[1]) %>% 
     pull(latitude)
   
@@ -241,7 +208,91 @@ all_predictions_df <- all_predictions %>%
 # 
 # write.csv(all_predictions_df, 'data/projected_bloomdates_ensemble.csv', row.names = FALSE)
 
-all_predictions_df <- read.csv('data/projected_bloomdates_ensemble.csv')
+
+# #have to redo predictions for almonds and the location santomera
+# all_predictions <- purrr::map(1:length(future_weather_list), function(i){
+#   split_name <- names(future_weather_list)[i] %>% 
+#     str_split_1(pattern = c('_')) %>%
+#     str_split(pattern = '\\.') %>% 
+#     unlist()
+#   
+#   if(split_name[1] != 'Santomera'){
+#     return(NULL)
+#   }
+#   
+#   lat <- stations %>% 
+#     filter(station_name == split_name[1]) %>% 
+#     pull(latitude)
+#   
+#   out <- future_weather_list[[i]] %>% 
+#     chillR::stack_hourly_temps(latitude = lat) %>% 
+#     purrr::pluck('hourtemps') %>% 
+#     genSeasonList(years = 2001:2100) %>% 
+#     wrapper_ensemble_predictions(input_list) %>% 
+#     mutate(location = split_name[1],
+#            gcm = split_name[3],
+#            ssp = split_name[2],
+#            scenario_year = split_name[4])
+#   
+#   return(out)
+# }, .progress = TRUE)
+# 
+# santomera_predictions_df <- all_predictions %>% 
+#   bind_rows()
+# 
+# all_predictions_df <- read.csv('data/projected_bloomdates_ensemble.csv')
+# 
+# all_predictions_df <- all_predictions_df %>% 
+#   rbind(santomera_predictions_df)
+# 
+# write.csv(x = all_predictions_df, 'data/projected_bloomdates_ensemble.csv', row.names = FALSE)
+# 
+
+#have to redo predictions now for almonds except santomoera
+# rm(all_predictions_df, santomera_predictions_df)
+# 
+# names(input_list)
+# 
+# #make almond predictions for all places but santomera (because we did it in the step before)
+# sub_input <- input_list[grepl('Almond', names(input_list))]
+# 
+# all_predictions <- purrr::map(1:length(future_weather_list), function(i){
+#   split_name <- names(future_weather_list)[i] %>% 
+#     str_split_1(pattern = c('_')) %>%
+#     str_split(pattern = '\\.') %>% 
+#     unlist()
+#   
+#   if(split_name[1] == 'Santomera'){
+#     return(NULL)
+#   }
+#   
+#   lat <- stations %>% 
+#     filter(station_name == split_name[1]) %>% 
+#     pull(latitude)
+#   
+#   out <- future_weather_list[[i]] %>% 
+#     chillR::stack_hourly_temps(latitude = lat) %>% 
+#     purrr::pluck('hourtemps') %>% 
+#     genSeasonList(years = 2001:2100) %>% 
+#     wrapper_ensemble_predictions(sub_input) %>% 
+#     mutate(location = split_name[1],
+#            gcm = split_name[3],
+#            ssp = split_name[2],
+#            scenario_year = split_name[4])
+#   
+#   return(out)
+# }, .progress = TRUE)
+# 
+# almond_predictions_df <- all_predictions %>% 
+#   bind_rows()
+# 
+# all_predictions_df <- read.csv('data/projected_bloomdates_ensemble.csv')
+# 
+# all_predictions_df <- all_predictions_df %>% 
+#   filter(!(location %in% c('Klein-Altendorf', 'Meknes', 'Cieza', 'Zaragoza', 'Sfax') & grepl('Almond', species_cultivar))) %>% 
+#   rbind(almond_predictions_df)
+# 
+# write.csv(x = all_predictions_df, 'data/projected_bloomdates_ensemble.csv', row.names = FALSE)
 
 
 

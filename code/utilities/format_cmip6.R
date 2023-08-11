@@ -61,7 +61,7 @@ create_scenario_list <- function(cmip6_one_station,
   #iterate over the different ssp scenarios
   listoflists <- purrr::map(cmip6_one_station, function(x){
     
-    print(unique(x$ssp))
+    #print(unique(x$ssp))
     
     #iterate over the different points of time we are interested in (2050, 2085)
     int <- purrr::map(times, function(time){
