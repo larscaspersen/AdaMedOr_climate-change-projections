@@ -3,25 +3,56 @@ library(tidyverse)
 library(ggplot2)
 library(patchwork)
 library(LarsChill)
+library(patchwork)
 
 
-setwd('../fruittree_portfolio/')
+#setwd('../fruittree_portfolio/')
 
 performance <- read.csv('data/performance_fitted_models.csv')
 
+adamedor <-read.csv('data/combined_phenological_data_adamedor_clean.csv') 
+
+f50_cult <- adamedor %>% 
+  dplyr::filter(species %in% c(c('Sweet Cherry', 'Pistachio', 'Pear', 'Apricot', 'Almond'))) %>% 
+  dplyr::select(species, cultivar, location, year, flowering_f50) %>% 
+  stats::na.omit() %>% 
+  group_by(species, cultivar) %>% 
+  summarise(n = n()) %>% 
+  dplyr::filter(n >= 20) %>% 
+  dplyr::pull(cultivar)
+
+
+f5_cult <- adamedor %>% 
+  dplyr::filter(species %in% c(c('Apple', 'European plum', 'Japanese plum'))) %>% 
+  dplyr::select(species, cultivar, location, year, begin_flowering_f5) %>% 
+  stats::na.omit() %>% 
+  group_by(species, cultivar) %>% 
+  summarise(n = n()) %>% 
+  dplyr::filter(n >= 20 )%>% 
+  dplyr::pull(cultivar)
+
+cultivar_n <- c(f50_cult, f5_cult)
+
+performance <- performance %>% 
+  dplyr::filter(cultivar %in% cultivar_n)
+
+
 median_df <- performance %>% 
-  filter(split == 'Calibration') %>% 
+  filter(split == 'Validation',
+         cultivar %in% cultivar_n) %>% 
   group_by(species, cultivar) %>% 
   summarise(median_rpiq = median(rpiq_adj),
             median_rmse = median(rmse),
             median_bias = median(mean_bias))
 
 #117 cultivars
-performance %>% 
+test <- performance %>% 
   group_by(species) %>% 
   summarise(n = length(unique(cultivar)))
+test
 
-xlabel <- 'Ratio of Performance to Interquartile Distance'
+sum(test$n)
+
 
 #maybe change name of European Plum / Japanese Plum / Pistachio inside the plot already to a, b, c
 
@@ -35,25 +66,25 @@ p1 <- performance %>%
   ggplot(aes(y = reorder(cultivar,  median_rpiq), fill = split, x = rpiq_adj)) +
   geom_boxplot() +
   theme_bw() +
-  xlim(0, 21) +
+  #xlim(0, 21) +
   geom_vline(xintercept = 1, linetype = 'dashed') +
   scale_fill_manual(values = c("steelblue", "#E69F00"), name = 'Data Split') +
   theme_bw(base_size = 15) +
-  ylab('Cultivar (ordered by decrasing RPIQ of calibration data)') +
+  ylab('Cultivar (ordered by decreasing RPIQ of validation data)') +
   xlab('Ratio of Performance to Interquartile Distance') +
   facet_grid(rows = vars(species_label), scales = 'free_y', space = "free")
 
 p2 <- performance %>% 
   merge.data.frame(median_df, by = c('species', 'cultivar')) %>% 
-  mutate(species_label = recode(species, `European Plum` = 'a',
-                                `Japanese Plum` = 'b',
-                                Pistachio = 'c')) %>% 
-  mutate(species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'a', 'b', 'Pear', 'c', 'Sweet Cherry'))) %>% 
+  mutate(species_label = recode(species, `European Plum` = 'ep',
+                                `Japanese Plum` = 'jp',
+                                Pistachio = 'pi')) %>% 
+  mutate(species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'jp', 'Pear', 'pi', 'Sweet Cherry'))) %>% 
   filter(!(species %in% c('Almond', 'Apple', 'Apricot'))) %>% 
   ggplot(aes(y = reorder(cultivar,  median_rpiq), fill = split, x = rpiq_adj)) +
   geom_boxplot() +
   theme_bw() +
-  xlim(0, 21) +
+  #xlim(0, 21) +
   geom_vline(xintercept = 1, linetype = 'dashed') +
   scale_fill_manual(values = c("steelblue", "#E69F00"), name = 'Data Split') +
   theme_bw(base_size = 15) +
@@ -61,14 +92,49 @@ p2 <- performance %>%
   xlab('Ratio of Performance to Interquartile Distance') +
   facet_grid(rows = vars(species_label), scales = 'free_y', space = "free")
 
-library(patchwork)
-
 p1 + p2 + plot_layout(guides = 'collect') & theme(legend.position= 'bottom') 
 ggsave('figures/paper/rpiq_all_cult.jpeg', device = 'jpeg',
        height = 25, width = 30, units = 'cm')
 
 
 
+p1 <- performance %>% 
+  merge.data.frame(median_df, by = c('species', 'cultivar')) %>% 
+  mutate(species_label = recode(species, `European Plum` = 'a',
+                                `Japanese Plum` = 'b',
+                                Pistachio = 'c')) %>% 
+  mutate(species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'a', 'b', 'Pear', 'c', 'Sweet Cherry'))) %>% 
+  filter(species %in% c('Almond', 'Apple', 'Apricot')) %>% 
+  ggplot(aes(y = reorder(cultivar,  median_rpiq), fill = split, x = rmse)) +
+  geom_boxplot() +
+  theme_bw() +
+  #xlim(0, 21) +
+  scale_fill_manual(values = c("steelblue", "#E69F00"), name = 'Data Split') +
+  theme_bw(base_size = 15) +
+  ylab('Cultivar (ordered by increasing RMSE of validation data)') +
+  xlab('Root Mean Square Error of\nBloom Prediction (days)') +
+  facet_grid(rows = vars(species_label), scales = 'free_y', space = "free")
+
+p2 <- performance %>% 
+  merge.data.frame(median_df, by = c('species', 'cultivar')) %>% 
+  mutate(species_label = recode(species, `European Plum` = 'ep',
+                                `Japanese Plum` = 'jp',
+                                Pistachio = 'pi')) %>% 
+  mutate(species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'jp', 'Pear', 'pi', 'Sweet Cherry'))) %>% 
+  filter(!(species %in% c('Almond', 'Apple', 'Apricot'))) %>% 
+  ggplot(aes(y = reorder(cultivar,  median_rpiq), fill = split, x = rpiq_adj)) +
+  geom_boxplot() +
+  theme_bw() +
+  #xlim(0, 21) +
+  scale_fill_manual(values = c("steelblue", "#E69F00"), name = 'Data Split') +
+  theme_bw(base_size = 15) +
+  ylab('') +
+  xlab('Root Mean Square Error of\nBloom Prediction (days)') +
+  facet_grid(rows = vars(species_label), scales = 'free_y', space = "free")
+
+p1 + p2 + plot_layout(guides = 'collect') & theme(legend.position= 'bottom') 
+ggsave('figures/paper/rmse_all_cult.jpeg', device = 'jpeg',
+       height = 25, width = 30, units = 'cm')
 
 
 
@@ -77,7 +143,8 @@ ggsave('figures/paper/rpiq_all_cult.jpeg', device = 'jpeg',
 #Performance across species ####
 #----------------------------------------------#
 
-prediction_df <- read.csv('data/predicted_flowering_vs_observed.csv')
+prediction_df <- read.csv('data/predicted_flowering_vs_observed.csv') %>% 
+  dplyr::filter(cultivar %in% cultivar_n)
 
 prediction_df <- prediction_df %>% 
   filter(!(species == 'Apple' & location == 'Klein-Altendorf' & cultivar == 'Elstar' & year %in% c(2008, 2010)),  #seems to be outlier
@@ -96,147 +163,66 @@ performance <- prediction_df %>%
             iqr_obs = mean(iqr_obs) ,
             rpiq_adj = iqr_obs / rmse) 
 
-performance %>% 
-  filter(split == 'Validation') %>% 
-  ggplot(aes(y = species, x = rpiq_adj)) +
-  geom_boxplot(aes(fill = species), show.legend = FALSE)+
-  scale_y_discrete(limits = rev)+
-  ylab('') +
-  xlab('Ratio of Performance to Interquartile Distance  (RPIQ) for Validation Data') + 
-  geom_vline(xintercept = 1, linetype = 'dashed') +
-  #  ggsci::scale_fill_tron()+
-  #  scale_fill_manual(values = viridis::viridis(8))+
-  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
-  theme_bw()
-ggsave('figures/paper/RPIQ_all_cultivars.jpeg', height = 15, width = 20, units = 'cm', device = 'jpeg')
+okabe <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7",'grey40' )
 
 
-performance %>% 
+
+p1 <- performance %>% 
   filter(split == 'Validation') %>% 
   ggplot(aes(y = species, x = rmse)) +
   geom_boxplot(aes(fill = species), show.legend = FALSE)+
   scale_y_discrete(limits = rev)+
   ylab('') +
-  xlab('Root Mean Square Error (RMSE) for Validation Data') + 
+  xlab('Root Mean Square Error (RMSE)\nfor Validation Data') + 
+  scale_fill_manual(values = okabe) +
   #geom_vline(xintercept = 1, linetype = 'dashed') +
   #  ggsci::scale_fill_tron()+
   #  scale_fill_manual(values = viridis::viridis(8))+
   #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
-  theme_bw()
-ggsave('figures/paper/RMSE_all_cultivars.jpeg', height = 15, width = 20, units = 'cm', device = 'jpeg')
+  theme_bw(base_size = 15)
 
+p2 <- performance %>% 
+  filter(split == 'Validation') %>% 
+  ggplot(aes(y = species, x = rpiq_adj)) +
+  geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  scale_y_discrete(limits = rev)+
+  ylab('') +
+  xlab('Ratio of Performance to Interquartile\nDistance (RPIQ) for Validation Data') + 
+  scale_fill_manual(values = okabe) +
+  geom_vline(xintercept = 1, linetype = 'dashed') +
+  #  ggsci::scale_fill_tron()+
+  #  scale_fill_manual(values = viridis::viridis(8))+
+  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
+  theme_bw(base_size = 15)+
+  theme(axis.ticks.y = element_blank(),
+        axis.text.y = element_blank())
+
+p1 + p2 + plot_layout(guides = 'collect') & 
+  plot_annotation(tag_levels = 'A') & 
+  theme(legend.position= 'bottom')
+  
+ggsave('figures/paper/performance_sum.jpeg', device = 'jpeg',
+       height = 15, width = 25, units = 'cm')
 
 
 #-------------------------------------------------------------#
 #Ensemble prediction ####
 #-------------------------------------------------------------#
 
-source('code/utilities/ensemble_prediction.R')
-source('code/utilities/load_fitting_result.R')
-
-# cka <- read.csv('data/weather_ready/cka_clean.csv') %>%
-#   filter(Year < 2022)
-# cieza <- read.csv('data/weather_ready/cieza_clean_patched.csv')
-# sfax <- read.csv('data/weather_ready/sfax_clean.csv')
-# meknes <- read.csv('data/weather_ready/meknes_clean.csv')
-# zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv') %>%
-#   filter(Year < 2022)
-# 
-# 
-# weather_list <- list('Klein-Altendorf' = cka,
-#                          'Cieza' = cieza,
-#                          'Zaragoza' = zaragoza,
-#                          'Sfax' = sfax,
-#                          'Meknes' = meknes)
-# 
-# stations <- read.csv('data/weather_ready/weather_station_phenological_observations.csv')
-# 
-# hourly_weather_list <- purrr::map(names(weather_list), function(x){
-# 
-#   weather_list[[x]] %>%
-#     chillR::stack_hourly_temps(latitude = stations$latitude[stations$station_name == x]) %>%
-#     purrr::pluck('hourtemps') %>%
-#     chillR::genSeasonList(years = (min(weather_list[[x]]$Year) + 1): max(weather_list[[x]]$Year)) %>%
-#     set_names((min(weather_list[[x]]$Year) + 1): max(weather_list[[x]]$Year))
-# 
-# 
-# })
-# 
-# names(hourly_weather_list) <- names(weather_list)
-# 
-# rm(weather_list, cka, cieza, sfax, meknes, zaragoza)
-# 
-# apricot_fit <- apple_fit <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <- almond_fit_old <-  list()
-# 
-# for(i in 1:10){
-#   apricot_fit[[i]] <- load_fitting_result('data/fitting/apricot/repeated_fitting_clean/', prefix = paste0('repeat', i, '_'))
-#   eplum_fit[[i]] <- load_fitting_result('data/fitting/european_plum/', prefix = paste0('repeat', i, '_'))
-#   jplum_fit[[i]] <- load_fitting_result('data/fitting/japanese_plum/', prefix = paste0('repeat', i, '_'))
-#   pistachio_fit[[i]] <- load_fitting_result('data/fitting/pistachio/', prefix = paste0('repeat', i, '_'))
-#   cherry_fit[[i]] <- load_fitting_result('data/fitting/sweet_cherry/repeated_fitting/', prefix = paste0('repeat', i, '_'))
-#   almond_fit_old[[i]]  <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting/', prefix = paste0('repeat', i, '_'))
-#   almond_fit[[i]] <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting_new_bounds', prefix = paste0('repeat', i, '_'))
-#   pear_fit[[i]] <- load_fitting_result('data/fitting/pear/', prefix = paste0('repeat', i, '_'))
-#   apple_fit[[i]] <- load_fitting_result('data/fitting/apple/', prefix = paste0('repeat', i, '_'))
-# }
-# 
-# fit_list <- list('Apricot' = apricot_fit,
-#                  'Apple' = apple_fit,
-#                  'European Plum' = eplum_fit,
-#                  'Japanese Plum' = jplum_fit,
-#                  'Pistachio' = pistachio_fit,
-#                  'Sweet Cherry' = cherry_fit,
-#                  'Almond' = almond_fit_old,
-#                  'Pear' = pear_fit)
-# 
-# 
-# 
-# ensemble_prediction <- purrr::map2(fit_list, names(fit_list), function(spec, spec_name){
-# 
-#   # spec <- fit_list[[6]]
-#   # spec_name <- names(fit_list)[6]
-# 
-# 
-#   cultivars <- names(spec[[1]])
-# 
-#   purrr::map(cultivars, function(cult_name){
-# 
-#     #cult_name <- cultivars[27]
-# 
-#     #extratc the cultivars parameter data
-#     par <- purrr::map(spec, cult_name)
-# 
-#     confidence <- performance %>%
-#       filter(cultivar == cult_name,
-#              species == spec_name,
-#              split == 'Validation') %>%
-#       pull(rpiq_adj)
-# 
-#     purrr::map2(hourly_weather_list, names(hourly_weather_list), function(weather, loc){
-#       out <- pheno_ensemble_prediction(par, confidence, temp = weather)
-# 
-#       data.frame(pred = out$predicted, sd = out$sd, species = spec_name,
-#                  cultivar = cult_name, location = loc, year = names(weather))
-#     }) %>%
-#       bind_rows()
-# 
-# 
-#   }) %>%
-#     bind_rows()
-# 
-# }, .progress = TRUE) %>%
-#   bind_rows()
-# 
-# write.csv(ensemble_prediction, 'data/projected_bloomdates_ensemble_observed_weather.csv', row.names = FALSE)
+#source('code/utilities/ensemble_prediction.R')
+#source('code/utilities/load_fitting_result.R')
 
 ensemble_prediction <- read.csv('data/projected_bloomdates_ensemble_observed_weather.csv')
 str(ensemble_prediction)
+str(prediction_df)
 
 enesmble_prediction_observed <- prediction_df %>% 
   mutate(year = as.character(year)) %>% 
-  merge.data.frame(ensemble_prediction, by = c('species', 'cultivar', 'location', 'year'), 
+  merge.data.frame(ensemble_prediction, 
+                   by.x = c('species', 'cultivar', 'location', 'year'),
+                   by.y = c('species', 'cultivar', 'location', 'scenario_year'),
                    all.x =  TRUE) %>% 
-  rename(pred_ensemble = pred.y, pred_single = pred.x) %>% 
+  rename(pred_ensemble = pheno_predicted, pred_single = pred) %>% 
   filter(repetition == 1)
 
 performance_ensemble <- enesmble_prediction_observed %>% 
@@ -273,6 +259,215 @@ ggsave('figures/paper/ensemble_prediction_performance.jpeg', height = 15, width 
 
 
 
+#have individual figures for the cultivars
+enesmble_prediction_observed %>% 
+  filter(species == 'Almond') %>% 
+  ggplot(aes(x = pheno, y = pred_ensemble)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
+  geom_abline(slope = 1) +
+  facet_wrap(~cultivar)+
+  ylab('Predicted Bloom Date') +
+  xlab('Observed Bloom Date') +
+  # geom_text(data = performance_ensemble,  y = 150, x = 1, 
+  #           aes(label = paste('RMSE:', format(RMSE, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 140, x = 1, 
+  #           aes(label = paste('RPIQ:', format(RPIQ, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 130, x = 1, 
+  #           aes(label = paste('Mean Bias:', format(mean_bias, nsmall = 1))), hjust = 0) +
+  scale_x_continuous(limits = c(0, 91),
+                     breaks = c(1, 32, 60,91), 
+                     labels = c('Jan', 'Feb', 'Mar', 'Apr')) +
+  scale_y_continuous(limits = c(0, 91),
+                     breaks = c(1, 32, 60,91), 
+                     labels = c('Jan', 'Feb', 'Mar', 'Apr')) +
+  theme_bw(base_size = 15) 
+ggsave('figures/paper/ensemble_prediction_performance_almond.jpeg', height = 15, width = 25,
+       units = 'cm', device = 'jpeg')
+
+enesmble_prediction_observed %>% 
+  filter(species == 'Apple') %>% 
+  ggplot(aes(x = pheno, y = pred_ensemble)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
+  geom_abline(slope = 1) +
+  facet_wrap(~cultivar)+
+  ylab('Predicted Bloom Date') +
+  xlab('Observed Bloom Date') +
+  # geom_text(data = performance_ensemble,  y = 150, x = 1, 
+  #           aes(label = paste('RMSE:', format(RMSE, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 140, x = 1, 
+  #           aes(label = paste('RPIQ:', format(RPIQ, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 130, x = 1, 
+  #           aes(label = paste('Mean Bias:', format(mean_bias, nsmall = 1))), hjust = 0) +
+  scale_x_continuous(limits = c(60, 152),
+                     breaks = c(60,91, 121, 152), 
+                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
+  scale_y_continuous(limits = c(60, 152),
+                     breaks = c(60,91, 121, 152), 
+                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
+  theme_bw(base_size = 15) 
+ggsave('figures/paper/ensemble_prediction_performance_apple.jpeg', height = 15, width = 25,
+       units = 'cm', device = 'jpeg')
+
+enesmble_prediction_observed %>% 
+  filter(species == 'Apricot') %>% 
+  ggplot(aes(x = pheno, y = pred_ensemble)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
+  geom_abline(slope = 1) +
+  facet_wrap(~cultivar)+
+  ylab('Predicted Bloom Date') +
+  xlab('Observed Bloom Date') +
+  # geom_text(data = performance_ensemble,  y = 150, x = 1, 
+  #           aes(label = paste('RMSE:', format(RMSE, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 140, x = 1, 
+  #           aes(label = paste('RPIQ:', format(RPIQ, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 130, x = 1, 
+  #           aes(label = paste('Mean Bias:', format(mean_bias, nsmall = 1))), hjust = 0) +
+  scale_x_continuous(limits = c(32, 91),
+                     breaks = c(32, 60,91), 
+                     labels = c('Feb', 'Mar', 'Apr')) +
+  scale_y_continuous(limits = c(32, 91),
+                     breaks = c( 32, 60,91), 
+                     labels = c('Feb', 'Mar', 'Apr')) +
+  theme_bw(base_size = 15) 
+ggsave('figures/paper/ensemble_prediction_performance_apricot.jpeg', height = 15, width = 25,
+       units = 'cm', device = 'jpeg')
+
+
+enesmble_prediction_observed %>% 
+  filter(species == 'European Plum') %>% 
+  ggplot(aes(x = pheno, y = pred_ensemble)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
+  geom_abline(slope = 1) +
+  facet_wrap(~cultivar)+
+  ylab('Predicted Bloom Date') +
+  xlab('Observed Bloom Date') +
+  # geom_text(data = performance_ensemble,  y = 150, x = 1, 
+  #           aes(label = paste('RMSE:', format(RMSE, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 140, x = 1, 
+  #           aes(label = paste('RPIQ:', format(RPIQ, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 130, x = 1, 
+  #           aes(label = paste('Mean Bias:', format(mean_bias, nsmall = 1))), hjust = 0) +
+  scale_x_continuous(limits = c(60, 152),
+                     breaks = c(60,91, 121, 152), 
+                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
+  scale_y_continuous(limits = c(60, 152),
+                     breaks = c(60,91, 121, 152), 
+                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
+  theme_bw(base_size = 15) 
+ggsave('figures/paper/ensemble_prediction_performance_european-plum.jpeg', height = 15, width = 25,
+       units = 'cm', device = 'jpeg')
+
+
+enesmble_prediction_observed %>% 
+  filter(species == 'Japanese Plum') %>% 
+  ggplot(aes(x = pheno, y = pred_ensemble)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
+  geom_abline(slope = 1) +
+  facet_wrap(~cultivar)+
+  ylab('Predicted Bloom Date') +
+  xlab('Observed Bloom Date') +
+  # geom_text(data = performance_ensemble,  y = 150, x = 1, 
+  #           aes(label = paste('RMSE:', format(RMSE, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 140, x = 1, 
+  #           aes(label = paste('RPIQ:', format(RPIQ, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 130, x = 1, 
+  #           aes(label = paste('Mean Bias:', format(mean_bias, nsmall = 1))), hjust = 0) +
+  scale_x_continuous(limits = c(60, 152),
+                     breaks = c(60,91, 121, 152), 
+                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
+  scale_y_continuous(limits = c(60, 152),
+                     breaks = c(60,91, 121, 152), 
+                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
+  theme_bw(base_size = 15) 
+ggsave('figures/paper/ensemble_prediction_performance_japanese-plum.jpeg', height = 15, width = 25,
+       units = 'cm', device = 'jpeg')
+
+
+
+enesmble_prediction_observed %>% 
+  filter(species == 'Pear') %>% 
+  ggplot(aes(x = pheno, y = pred_ensemble)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
+  geom_abline(slope = 1) +
+  facet_wrap(~cultivar)+
+  ylab('Predicted Bloom Date') +
+  xlab('Observed Bloom Date') +
+  # geom_text(data = performance_ensemble,  y = 150, x = 1, 
+  #           aes(label = paste('RMSE:', format(RMSE, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 140, x = 1, 
+  #           aes(label = paste('RPIQ:', format(RPIQ, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 130, x = 1, 
+  #           aes(label = paste('Mean Bias:', format(mean_bias, nsmall = 1))), hjust = 0) +
+  scale_x_continuous(limits = c(60, 152),
+                     breaks = c(60,91, 121, 152), 
+                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
+  scale_y_continuous(limits = c(60, 152),
+                     breaks = c(60,91, 121, 152), 
+                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
+  theme_bw(base_size = 15) 
+ggsave('figures/paper/ensemble_prediction_performance_pear.jpeg', height = 15, width = 25,
+       units = 'cm', device = 'jpeg')
+
+
+
+enesmble_prediction_observed %>% 
+  filter(species == 'Pistachio') %>% 
+  ggplot(aes(x = pheno, y = pred_ensemble)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
+  geom_abline(slope = 1) +
+  facet_wrap(~cultivar)+
+  ylab('Predicted Bloom Date') +
+  xlab('Observed Bloom Date') +
+  # geom_text(data = performance_ensemble,  y = 150, x = 1, 
+  #           aes(label = paste('RMSE:', format(RMSE, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 140, x = 1, 
+  #           aes(label = paste('RPIQ:', format(RPIQ, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 130, x = 1, 
+  #           aes(label = paste('Mean Bias:', format(mean_bias, nsmall = 1))), hjust = 0) +
+  scale_x_continuous(limits = c(60, 152),
+                     breaks = c(60,91, 121, 152), 
+                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
+  scale_y_continuous(limits = c(60, 152),
+                     breaks = c(60,91, 121, 152), 
+                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
+  theme_bw(base_size = 15) 
+ggsave('figures/paper/ensemble_prediction_performance_pistachio.jpeg', height = 15, width = 25,
+       units = 'cm', device = 'jpeg')
+
+
+enesmble_prediction_observed %>% 
+  filter(species == 'Sweet Cherry') %>% 
+  ggplot(aes(x = pheno, y = pred_ensemble)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
+  geom_abline(slope = 1) +
+  facet_wrap(~cultivar)+
+  ylab('Predicted Bloom Date') +
+  xlab('Observed Bloom Date') +
+  # geom_text(data = performance_ensemble,  y = 150, x = 1, 
+  #           aes(label = paste('RMSE:', format(RMSE, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 140, x = 1, 
+  #           aes(label = paste('RPIQ:', format(RPIQ, nsmall = 1))), hjust = 0) +
+  # geom_text(data = performance_ensemble,  y = 130, x = 1, 
+  #           aes(label = paste('Mean Bias:', format(mean_bias, nsmall = 1))), hjust = 0) +
+  scale_x_continuous(limits = c(60, 152),
+                     breaks = c(60,91, 121, 152), 
+                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
+  scale_y_continuous(limits = c(60, 152),
+                     breaks = c(60,91, 121, 152), 
+                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
+  theme_bw(base_size = 15) 
+ggsave('figures/paper/ensemble_prediction_performance_sweet-cherry.jpeg', height = 15, width = 25,
+       units = 'cm', device = 'jpeg')
+
+
 
 #--------------------------------------------------------------#
 # Time Windows Comparison of Methods####
@@ -280,6 +475,631 @@ ggsave('figures/paper/ensemble_prediction_performance.jpeg', height = 15, width 
 
 #make the plot of the window comparison
 #draw empty plot with the empirical time windows
+
+#rm(list = ls())
+#make plot of thermal time window
+
+#make predictions for the actual weather data
+cka <- read.csv('data/weather_ready/cka_clean.csv') %>% 
+  filter(Year < 2022)
+cieza <- read.csv('data/weather_ready/cieza_clean_patched.csv')
+sfax <- read.csv('data/weather_ready/sfax_clean.csv')
+meknes <- read.csv('data/weather_ready/meknes_clean.csv')
+zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv') %>% 
+  filter(Year < 2022)
+santomera <- read.csv('data/weather_ready/murcia_clean.csv')
+
+
+weather_list_obs <- list('Klein-Altendorf' = cka,
+                         'Cieza' = cieza,
+                         'Zaragoza' = zaragoza,
+                         'Sfax' = sfax,
+                         'Meknes' = meknes,
+                         'Santomera' = santomera)
+weather_list_pred <- weather_list_obs
+
+adamedor <- read.csv('data/combined_phenological_data_adamedor_clean.csv') %>% 
+  filter(!(species == 'Apple' & location == 'Klein-Altendorf' & cultivar == 'Elstar' & year %in% c(2008, 2010)),
+         !(species == 'Apricot' & location == 'Cieza' & cultivar == 'Sublime' & year == 2014))
+
+
+frost_threshold <- 0
+heat_threshold <- 32
+observation_df <- adamedor %>% 
+  filter(!(species %in% c( 'Peach', 'Olive')))
+
+thermal_time_window <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) LarsChill::get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
+                                                                                                                                weather_list_pred = weather_list_obs, 
+                                                                                                                                observation_df = observation_df, 
+                                                                                                                                frost_threshold = frost_threshold, 
+                                                                                                                                heat_threshold = heat_threshold, 
+                                                                                                                                target_col_obs = x,
+                                                                                                                                padding = 0.03)) %>% 
+  bind_rows()
+
+
+thermal_time_window %>% 
+  mutate(loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))),
+         species = stringr::str_to_title(species),
+         flowering_label = recode(flowering_type, begin_flowering_f5 = '10% Flowering',
+                                  flowering_f50 = '50% Flowering'),
+         species_label = recode(species, 
+                                `European Plum` = 'Europ. Plum',
+                                `Japanese Plum` = 'Jap. Plum')) %>% 
+  ggplot(aes(x = loc)) +
+  geom_rect(aes(ymin = min_doy_padded, ymax = max_doy_padded, xmin = loc-0.3, xmax = loc+0.3),fill = 'steelblue') +
+  scale_x_continuous(breaks = 1:6, labels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')) +
+  scale_y_continuous(breaks= c(-31, 0, 32, 60, 91, 121, 152, 182, 213), 
+                     minor_breaks = c(-15, 15, 46, 74, 105, 135, 166, 194), 
+                     labels = c('Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug')) +
+  ylab('Month') +
+  xlab('Location') +
+  facet_grid(flowering_label~species_label) +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom')
+ggsave('figures/paper/example_timewindow.jpeg', height = 20, width = 27, units = 'cm', device = 'jpeg')
+
+
+
+
+#----------------------------------#
+#change bloom date
+#----------------------------------#
+
+pheno_2015 <- read.csv('data/projected_bloomdates_ensemble_historic_scenarios.csv')
+
+pheno_future <- read.csv('data/projected_bloomdates_ensemble.csv') %>% 
+  separate(species_cultivar, into = c('species', 'cultivar'), sep = '_') %>% 
+  rename(pheno_hist = pheno_predicted)
+
+#calculate median for both
+median_2015 <- pheno_2015 %>% 
+  group_by(species, cultivar, location) %>% 
+  summarise(med_current = median(pheno_predicted))
+
+median_future <- pheno_future %>% 
+  group_by(species, cultivar, location, ssp, gcm, scenario_year) %>% 
+  summarise(med_future = median(pheno_hist))
+
+rm(pheno_2015, pheno_future)
+
+shift_df <- merge(median_2015, median_future, by = c('species', 'cultivar', 'location')) %>% 
+  mutate(shift_bloom = round(med_future - med_current, digits = 2)) %>% 
+  filter(cultivar %in% cultivar_n)
+
+
+#get number of cultivars
+ncult <- shift_df %>% 
+  group_by(species) %>% 
+  summarise(cult =unique(cultivar)) %>% 
+  ungroup() %>% 
+  nrow()
+
+#assign number to cultivars, keep order as in the plot
+cult_num_df <- shift_df %>% 
+  group_by(species) %>% 
+  summarise(cultivar =unique(cultivar)) %>% 
+  ungroup() %>% 
+  mutate(cult_num  =ncult:1)
+
+#merge the two
+p1 <- shift_df %>% 
+  merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
+  mutate(species_label = recode(species, `European Plum` = 'ep',
+                                `Japanese Plum` = 'jp',
+                                Pistachio = 'pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'jp', 'Pear', 'pi', 'Sweet Cherry')),
+         location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
+                           Meknes = 'Mekn.',
+                           Santomera = 'Santo.',
+                           Zaragoza = 'Zarag.'),
+         dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2)) %>% 
+  filter((species %in% c('Almond', 'Apple', 'Apricot')),
+         scenario_year == '2050') %>% 
+  ggplot(ggplot2::aes(y = cult_num)) +
+  # geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = -Inf, ymax = Inf,
+  #               fill = 'Time Window: "Thermal Risk"'), alpha = 0.3) +
+  geom_rect(aes(xmin = med_current, xmax = med_future, ymin = cult_num + dodge_low, ymax = cult_num + dodge_up, fill = ssp)) +
+  geom_point(aes(x = med_future, y = cult_num + ((dodge_low + dodge_up)/2),  col = ssp, fill = ssp), 
+             show.legend = FALSE, shape = 18) + 
+  geom_rect(aes(xmin = med_current - 2.5, xmax = med_current + 2.5, ymax = cult_num - 0.4, ymin = cult_num + 0.4, fill = 'Simulation 2020'),  size = 2) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species_label~location, scales = 'free_y', space = 'free_y') +
+  scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(values = c('black', "#56B4E9", "#009E73","#F0E442",  "#E69F00", 'grey70'))+
+  theme_bw(base_size = 15) +
+  scale_x_continuous(breaks = c(1,  182, 335), 
+                     labels = c('Jan', 'Jul', 'Dec'),
+                     minor_breaks = c(32, 60,91, 121, 152, 213, 244, 274, 305, 365)) +
+  coord_cartesian(xlim = c(1, 365)) +
+  ggh4x::facetted_pos_scales(y = list(
+    species_label == 'Almond' ~ scale_y_continuous(limits = c(72,110), breaks = 72:110, labels = cult_num_df$cultivar[39:1]),
+    species_label == 'Apple' ~ scale_y_continuous(limits = c(67-0.5, 71+0.5), breaks = 67:71, labels = cult_num_df$cultivar[44:40]),
+    species_label == 'Apricot' ~ scale_y_continuous(limits = c(54-0.5, 66+0.5), breaks = 54:66, labels = cult_num_df$cultivar[57:45]))
+  ) +
+  theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  ylab('') +
+  xlab('Median Predicted Bloom Date') +
+  guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
+
+
+p2 <- shift_df %>% 
+  merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
+  mutate(species_label = recode(species, `European Plum` = 'ep',
+                                `Japanese Plum` = 'jp',
+                                Pistachio = 'pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'jp', 'Pear', 'pi', 'Sweet Cherry')),
+         location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
+                           Meknes = 'Mekn.',
+                           Santomera = 'Santo.',
+                           Zaragoza = 'Zarag.'),
+         dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2)) %>% 
+  filter(!(species %in% c('Almond', 'Apple', 'Apricot')),
+         scenario_year == '2050') %>% 
+  ggplot(ggplot2::aes(y = cult_num)) +
+  # geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = -Inf, ymax = Inf,
+  #               fill = 'Time Window: "Thermal Risk"'), alpha = 0.3) +
+  geom_rect(aes(xmin = med_current, xmax = med_future, ymin = cult_num + dodge_low, ymax = cult_num + dodge_up, fill = ssp)) +
+  geom_point(aes(x = med_future, y = cult_num + ((dodge_low + dodge_up)/2),  col = ssp, fill = ssp), 
+             show.legend = FALSE, shape = 18) + 
+  geom_rect(aes(xmin = med_current - 2.5, xmax = med_current + 2.5, ymax = cult_num - 0.4, ymin = cult_num + 0.4, fill = 'Simulation 2020'),  size = 2) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species_label~location, scales = 'free_y', space = 'free_y') +
+  scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(values = c('black', "#56B4E9", "#009E73","#F0E442",  "#E69F00", 'grey70'))+
+  theme_bw(base_size = 15) +
+  scale_x_continuous(breaks = c(1,  182, 335), 
+                     labels = c('Jan', 'Jul', 'Dec'),
+                     minor_breaks = c(32, 60,91, 121, 152, 213, 244, 274, 305, 365)) +
+  coord_cartesian(xlim = c(1, 365)) +
+  ggh4x::facetted_pos_scales(y = list(
+    species_label == 'ep' ~ ggplot2::scale_y_continuous(limits = c(53-0.5, 53+ 0.5), breaks = 53, labels = cult_num_df$cultivar[58]),
+    species_label == 'jp' ~ ggplot2::scale_y_continuous(limits = (c(52-0.5, 52+0.5)), breaks = 52, labels = cult_num_df$cultivar[59]),
+    species_label == 'Pear' ~ ggplot2::scale_y_continuous(limits = (c(37, 51)), breaks = 37:51, labels = cult_num_df$cultivar[74:60]),
+    species_label == 'pi' ~ ggplot2::scale_y_continuous(limits = (c(35-0.5, 36+0.5)), breaks = 35:36, labels = cult_num_df$cultivar[76:75]),
+    species_label == 'Sweet Cherry' ~ ggplot2::scale_y_continuous(limits = (c(1, 34)), breaks = 1:34, labels = cult_num_df$cultivar[110:77]))
+  ) +
+  theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  ylab('') +
+  xlab('Median Predicted Bloom Date') +
+  guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
+  
+  
+p1 + p2 + plot_layout(guides = 'collect') & ggplot2::theme(legend.position= 'bottom') 
+ggplot2::ggsave('figures/paper/change_med_bloom_2050.jpeg', device = 'jpeg',
+                height = 27, width = 31, units = 'cm')
+
+
+
+
+
+
+p1 <- shift_df %>% 
+  merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
+  mutate(species_label = recode(species, `European Plum` = 'ep',
+                                `Japanese Plum` = 'jp',
+                                Pistachio = 'pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'jp', 'Pear', 'pi', 'Sweet Cherry')),
+         location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
+                           Meknes = 'Mekn.',
+                           Santomera = 'Santo.',
+                           Zaragoza = 'Zarag.'),
+         dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2)) %>% 
+  filter((species %in% c('Almond', 'Apple', 'Apricot')),
+         scenario_year == '2085') %>% 
+  ggplot(ggplot2::aes(y = cult_num)) +
+  # geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = -Inf, ymax = Inf,
+  #               fill = 'Time Window: "Thermal Risk"'), alpha = 0.3) +
+  geom_rect(aes(xmin = med_current, xmax = med_future, ymin = cult_num + dodge_low, ymax = cult_num + dodge_up, fill = ssp)) +
+  geom_point(aes(x = med_future, y = cult_num + ((dodge_low + dodge_up)/2),  col = ssp, fill = ssp), 
+             show.legend = FALSE, shape = 18) + 
+  geom_rect(aes(xmin = med_current - 2.5, xmax = med_current + 2.5, ymax = cult_num - 0.4, ymin = cult_num + 0.4, fill = 'Simulation 2020'),  size = 2) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species_label~location, scales = 'free_y', space = 'free_y') +
+  scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(values = c('black', "#56B4E9", "#009E73","#F0E442",  "#E69F00", 'grey70'))+
+  theme_bw(base_size = 15) +
+  scale_x_continuous(breaks = c(1,  182, 335), 
+                     labels = c('Jan', 'Jul', 'Dec'),
+                     minor_breaks = c(32, 60,91, 121, 152, 213, 244, 274, 305, 365)) +
+  coord_cartesian(xlim = c(1, 365)) +
+  ggh4x::facetted_pos_scales(y = list(
+    species_label == 'Almond' ~ scale_y_continuous(limits = c(72,110), breaks = 72:110, labels = cult_num_df$cultivar[39:1]),
+    species_label == 'Apple' ~ scale_y_continuous(limits = c(67-0.5, 71+0.5), breaks = 67:71, labels = cult_num_df$cultivar[44:40]),
+    species_label == 'Apricot' ~ scale_y_continuous(limits = c(54-0.5, 66+0.5), breaks = 54:66, labels = cult_num_df$cultivar[57:45]))
+  ) +
+  theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  ylab('') +
+  xlab('Median Predicted Bloom Date') +
+  guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
+
+
+p2 <- shift_df %>% 
+  merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
+  mutate(species_label = recode(species, `European Plum` = 'ep',
+                                `Japanese Plum` = 'jp',
+                                Pistachio = 'pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'jp', 'Pear', 'pi', 'Sweet Cherry')),
+         location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
+                           Meknes = 'Mekn.',
+                           Santomera = 'Santo.',
+                           Zaragoza = 'Zarag.'),
+         dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2)) %>% 
+  filter(!(species %in% c('Almond', 'Apple', 'Apricot')),
+         scenario_year == '2085') %>% 
+  ggplot(ggplot2::aes(y = cult_num)) +
+  # geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = -Inf, ymax = Inf,
+  #               fill = 'Time Window: "Thermal Risk"'), alpha = 0.3) +
+  geom_rect(aes(xmin = med_current, xmax = med_future, ymin = cult_num + dodge_low, ymax = cult_num + dodge_up, fill = ssp)) +
+  geom_point(aes(x = med_future, y = cult_num + ((dodge_low + dodge_up)/2),  col = ssp, fill = ssp), 
+             show.legend = FALSE, shape = 18) + 
+  geom_rect(aes(xmin = med_current - 2.5, xmax = med_current + 2.5, ymax = cult_num - 0.4, ymin = cult_num + 0.4, fill = 'Simulation 2020'),  size = 2) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species_label~location, scales = 'free_y', space = 'free_y') +
+  scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(values = c('black', "#56B4E9", "#009E73","#F0E442",  "#E69F00", 'grey70'))+
+  theme_bw(base_size = 15) +
+  scale_x_continuous(breaks = c(1,  182, 335), 
+                     labels = c('Jan', 'Jul', 'Dec'),
+                     minor_breaks = c(32, 60,91, 121, 152, 213, 244, 274, 305, 365)) +
+  coord_cartesian(xlim = c(1, 365)) +
+  ggh4x::facetted_pos_scales(y = list(
+    species_label == 'ep' ~ ggplot2::scale_y_continuous(limits = c(53-0.5, 53+ 0.5), breaks = 53, labels = cult_num_df$cultivar[58]),
+    species_label == 'jp' ~ ggplot2::scale_y_continuous(limits = (c(52-0.5, 52+0.5)), breaks = 52, labels = cult_num_df$cultivar[59]),
+    species_label == 'Pear' ~ ggplot2::scale_y_continuous(limits = (c(37, 51)), breaks = 37:51, labels = cult_num_df$cultivar[74:60]),
+    species_label == 'pi' ~ ggplot2::scale_y_continuous(limits = (c(35-0.5, 36+0.5)), breaks = 35:36, labels = cult_num_df$cultivar[76:75]),
+    species_label == 'Sweet Cherry' ~ ggplot2::scale_y_continuous(limits = (c(1, 34)), breaks = 1:34, labels = cult_num_df$cultivar[110:77]))
+  ) +
+  theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  ylab('') +
+  xlab('Median Predicted Bloom Date') +
+  guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
+
+
+p1 + p2 + plot_layout(guides = 'collect') & ggplot2::theme(legend.position= 'bottom') 
+ggplot2::ggsave('figures/paper/change_med_bloom_2085.jpeg', device = 'jpeg',
+                height = 27, width = 31, units = 'cm')
+
+
+
+#------------------------------------#
+#summarize the the figure in a boxplot
+#------------------------------------#
+
+hist_gen_weather <- chillR::load_temperature_scenarios('data/hist-sim-weather/', prefix = 'hist_gen_2015')
+
+for(i in 1:length(hist_gen_weather)){
+  colnames(hist_gen_weather[[i]]) <- c('DATE', 'Year', 'Month', 'Day', 'nodata', 'Tmin', 'Tmax')
+}
+
+thermal_window_2015 <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
+                                                                                                                weather_list_pred = weather_list_obs, 
+                                                                                                                observation_df = observation_df, 
+                                                                                                                frost_threshold = frost_threshold, 
+                                                                                                                heat_threshold = heat_threshold, 
+                                                                                                                target_col_obs = x,
+                                                                                                                padding = 0.03)) %>% 
+  bind_rows() %>% 
+  mutate(species = tolower(species))
+
+rm(hist_gen_weather)
+
+
+shift_df %>% 
+  mutate(flowering_type = ifelse(species %in% c('European Plum', 'Japanese Plum', 'Apple'), yes = 'begin_flowering_f5', no = 'flowering_f50'),
+         species = tolower(species)) %>% 
+  merge(thermal_window_2015, by = c('species', 'location', 'flowering_type')) %>% 
+  mutate(postion_hist_window = ifelse(med_current < min_doy_padded, yes = 'earlier', no = ifelse(med_current > max_doy_padded, yes = 'later', no = 'within')),
+         col_fil = paste(scenario_year, postion_hist_window, sep = '_'),
+         col_fil = factor(col_fil, levels = c('2050_earlier', '2085_earlier', '2050_within', '2085_within', '2050_later', '2085_later')),
+         species = stringr::str_to_title(species)) %>% 
+  ggplot(aes(x = species, y = shift_bloom, fill = col_fil)) +
+  geom_boxplot() +
+  scale_fill_manual(breaks = c('2050_earlier', '2085_earlier', '2050_within', '2085_within', '2050_later', '2085_later'),
+                    values = c('lightblue', 'steelblue', 'lightgreen', 'limegreen', 'lightpink', 'lightcoral'),
+                    labels = c('2050 Earlier', '2085 Earlier', '2050 Within', '2085 Within', '2050 Later', '2085 Later')) +
+  facet_grid(location ~ ssp) +
+  theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1), legend.position = 'bottom')
+
+
+shift_df %>% 
+  mutate(flowering_type = ifelse(species %in% c('European Plum', 'Japanese Plum', 'Apple'), yes = 'begin_flowering_f5', no = 'flowering_f50'),
+         species = tolower(species)) %>% 
+  merge(thermal_window_2015, by = c('species', 'location', 'flowering_type')) %>% 
+  mutate(postion_hist_window = ifelse(med_current < min_doy_padded, yes = 'earlier', no = ifelse(med_current > max_doy_padded, yes = 'later', no = 'within')),
+         col_fil = paste(ssp, scenario_year, sep = '_'),
+         col_fil = factor(col_fil, levels = c('ssp126_2050', 'ssp126_2085', 'ssp245_2050', 'ssp245_2085', 'ssp370_2050', 'ssp370_2085', 'ssp585_2050', 'ssp585_2085')),
+         species = stringr::str_to_title(species)) %>% 
+  mutate(species = recode(species, 
+                          `European Plum` = 'Europ Plum',
+                          `Japanese Plum` = 'Jap. Plum',
+                          `Sweet Cherry` = 'Sw. Cherry')) %>% 
+  ggplot(aes(x = species, y = shift_bloom, fill = col_fil)) +
+  geom_boxplot() +
+  ylab('Shift in Median Bloom Dates (Days)\ncompared to 2015') +
+  xlab('')+
+  scale_fill_manual(values = c('lightblue', 'steelblue', 'lightgreen', 'limegreen', 'darkgoldenrod1', 'darkorange', 'thistle', 'violetred'),
+                    breaks = c('ssp126_2050', 'ssp126_2085', 'ssp245_2050', 'ssp245_2085', 'ssp370_2050', 'ssp370_2085', 'ssp585_2050', 'ssp585_2085'),
+                    labels = c('SSP126 2050', 'SSP126 2085', 'SSP245 2050', 'SSP245 2085', 'SSP370 2050', 'SSP370 2085', 'SSP585 2050', 'SSP585 2085'),
+                    name = 'Climate Change\nScenario and Year') +
+  facet_wrap( ~ location, ncol = 2) +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1), legend.position = 'right')
+ggsave('figures/paper/shift_median_flowering_summarized.jpeg', height = 20, width = 30, units = 'cm', device = 'jpeg')
+
+
+
+#------------------------#
+#change in failure
+#------------------------#
+fail_2015 <- read.csv('data/failure-rate_thermal-risk_2020-sim.csv')
+fail_future <- read.csv('data/failure-rate_thermal-risk_future.csv')
+
+unique(fail_2015$species)
+unique(fail_future$species)
+unique(pheno_2015$species)
+unique(pheno_future$species)
+unique(shift_df$species)
+unique(thermal_window_2015$species)
+
+
+fail_shift <- fail_2015 %>% 
+  rename(failure_hist = failure_rate) %>% 
+  merge(fail_future, by = c('species', 'cultivar', 'location')) %>% 
+  mutate(change_fail = failure_rate - failure_hist)
+  
+
+
+#2050
+  
+p1 <- fail_shift %>% 
+  mutate(species = stringr::str_to_title(species)) %>% 
+  merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
+  mutate(species_label = recode(species, `European Plum` = 'ep',
+                                `Japanese Plum` = 'jp',
+                                Pistachio = 'pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'jp', 'Pear', 'pi', 'Sweet Cherry')),
+         location = recode(location, 
+                           `Klein-Altendorf` = 'Kl.-Alt.',
+                           Meknes = 'Mekn.',
+                           Santomera = 'Santo.',
+                           Zaragoza = 'Zarag.'),
+         dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2)) %>% 
+  filter((species %in% c('Almond', 'Apple', 'Apricot')),
+         scenario_year == '2050') %>% 
+  ggplot(ggplot2::aes(y = cult_num)) +
+  # geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = -Inf, ymax = Inf,
+  #               fill = 'Time Window: "Thermal Risk"'), alpha = 0.3) +
+  geom_rect(aes(xmin = failure_hist, xmax = failure_rate, ymin = cult_num + dodge_low, ymax = cult_num + dodge_up, fill = ssp)) +
+  geom_point(aes(x = failure_rate, y = cult_num + ((dodge_low + dodge_up)/2),  col = ssp, fill = ssp), 
+             show.legend = FALSE, shape = 18) + 
+  geom_rect(aes(xmin = failure_hist - 1, xmax = failure_hist + 1, ymax = cult_num - 0.4, ymin = cult_num + 0.4, fill = 'Simulation 2020'),  size = 2) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species_label~location, scales = 'free_y', space = 'free_y') +
+  scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(values = c('black', "#56B4E9", "#009E73","#F0E442",  "#E69F00", 'grey70'))+
+  theme_bw(base_size = 15) +
+  scale_x_continuous(breaks = c(0, 50, 100), 
+                     labels = c('0%', '50%', '100%'),
+                     minor_breaks = c(0, 25, 50, 75, 100)) +
+  ggh4x::facetted_pos_scales(y = list(
+    species_label == 'Almond' ~ scale_y_continuous(limits = c(72,110), breaks = 72:110, labels = cult_num_df$cultivar[39:1]),
+    species_label == 'Apple' ~ scale_y_continuous(limits = c(67-0.5, 71+0.5), breaks = 67:71, labels = cult_num_df$cultivar[44:40]),
+    species_label == 'Apricot' ~ scale_y_continuous(limits = c(54-0.5, 66+0.5), breaks = 54:66, labels = cult_num_df$cultivar[57:45]))
+  ) +
+  theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  ylab('') +
+  xlab('Share of Predicted Flowering outside of Bloom Window') +
+  guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
+
+
+p2 <- fail_shift %>% 
+  mutate(species = stringr::str_to_title(species)) %>% 
+  merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
+  mutate(species_label = recode(species, `European Plum` = 'ep',
+                                `Japanese Plum` = 'jp',
+                                Pistachio = 'pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'jp', 'Pear', 'pi', 'Sweet Cherry')),
+         location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
+                           Meknes = 'Mekn.',
+                           Santomera = 'Santo.',
+                           Zaragoza = 'Zarag.'),
+         dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2)) %>% 
+  filter(!(species %in% c('Almond', 'Apple', 'Apricot')),
+         scenario_year == '2050') %>% 
+  ggplot(ggplot2::aes(y = cult_num)) +
+  # geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = -Inf, ymax = Inf,
+  #               fill = 'Time Window: "Thermal Risk"'), alpha = 0.3) +
+  geom_rect(aes(xmin = failure_hist, xmax = failure_rate, ymin = cult_num + dodge_low, ymax = cult_num + dodge_up, fill = ssp)) +
+  geom_point(aes(x = failure_rate, y = cult_num + ((dodge_low + dodge_up)/2),  col = ssp, fill = ssp), 
+             show.legend = FALSE, shape = 18) + 
+  geom_rect(aes(xmin = failure_hist - 1, xmax = failure_hist + 1, ymax = cult_num - 0.4, ymin = cult_num + 0.4, fill = 'Simulation 2020'),  size = 2) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species_label~location, scales = 'free_y', space = 'free_y') +
+  scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(values = c('black', "#56B4E9", "#009E73","#F0E442",  "#E69F00", 'grey70'))+
+  theme_bw(base_size = 15) +
+  scale_x_continuous(breaks = c(0, 50, 100), 
+                     labels = c('0%', '50%', '100%'),
+                     minor_breaks = c(0, 25, 50, 75, 100)) +
+  ggh4x::facetted_pos_scales(y = list(
+    species_label == 'ep' ~ ggplot2::scale_y_continuous(limits = c(53-0.5, 53+ 0.5), breaks = 53, labels = cult_num_df$cultivar[58]),
+    species_label == 'jp' ~ ggplot2::scale_y_continuous(limits = (c(52-0.5, 52+0.5)), breaks = 52, labels = cult_num_df$cultivar[59]),
+    species_label == 'Pear' ~ ggplot2::scale_y_continuous(limits = (c(37, 51)), breaks = 37:51, labels = cult_num_df$cultivar[74:60]),
+    species_label == 'pi' ~ ggplot2::scale_y_continuous(limits = (c(35-0.5, 36+0.5)), breaks = 35:36, labels = cult_num_df$cultivar[76:75]),
+    species_label == 'Sweet Cherry' ~ ggplot2::scale_y_continuous(limits = (c(1, 34)), breaks = 1:34, labels = cult_num_df$cultivar[110:77]))
+  ) +
+  theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  ylab('') +
+  xlab('Share of Predicted Flowering outside of Bloom Window') +
+  guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
+
+
+p1 + p2 + plot_layout(guides = 'collect') & ggplot2::theme(legend.position= 'bottom') 
+ggplot2::ggsave('figures/paper/change_failure_rate_2050.jpeg', device = 'jpeg',
+                height = 27, width = 31, units = 'cm')
+
+###2085
+
+p1 <- fail_shift %>% 
+  mutate(species = stringr::str_to_title(species)) %>% 
+  merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
+  mutate(species_label = recode(species, `European Plum` = 'ep',
+                                `Japanese Plum` = 'jp',
+                                Pistachio = 'pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'jp', 'Pear', 'pi', 'Sweet Cherry')),
+         location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
+                           Meknes = 'Mekn.',
+                           Santomera = 'Santo.',
+                           Zaragoza = 'Zarag.'),
+         dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2)) %>% 
+  filter((species %in% c('Almond', 'Apple', 'Apricot')),
+         scenario_year == '2085') %>% 
+  ggplot(ggplot2::aes(y = cult_num)) +
+  # geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = -Inf, ymax = Inf,
+  #               fill = 'Time Window: "Thermal Risk"'), alpha = 0.3) +
+  geom_rect(aes(xmin = failure_hist, xmax = failure_rate, ymin = cult_num + dodge_low, ymax = cult_num + dodge_up, fill = ssp)) +
+  geom_point(aes(x = failure_rate, y = cult_num + ((dodge_low + dodge_up)/2),  col = ssp, fill = ssp), 
+             show.legend = FALSE, shape = 18) + 
+  geom_rect(aes(xmin = failure_hist - 1, xmax = failure_hist + 1, ymax = cult_num - 0.4, ymin = cult_num + 0.4, fill = 'Simulation 2020'),  size = 2) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species_label~location, scales = 'free_y', space = 'free_y') +
+  scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(values = c('black', "#56B4E9", "#009E73","#F0E442",  "#E69F00", 'grey70'))+
+  theme_bw(base_size = 15) +
+  scale_x_continuous(breaks = c(0, 50, 100), 
+                     labels = c('0%', '50%', '100%'),
+                     minor_breaks = c(0, 25, 50, 75, 100)) +
+  ggh4x::facetted_pos_scales(y = list(
+    species_label == 'Almond' ~ scale_y_continuous(limits = c(72,110), breaks = 72:110, labels = cult_num_df$cultivar[39:1]),
+    species_label == 'Apple' ~ scale_y_continuous(limits = c(67-0.5, 71+0.5), breaks = 67:71, labels = cult_num_df$cultivar[44:40]),
+    species_label == 'Apricot' ~ scale_y_continuous(limits = c(54-0.5, 66+0.5), breaks = 54:66, labels = cult_num_df$cultivar[57:45]))
+  ) +
+  theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  ylab('') +
+  xlab('Share of Predicted Flowering outside of Bloom Window') +
+  guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
+
+
+p2 <- fail_shift %>% 
+  mutate(species = stringr::str_to_title(species)) %>% 
+  merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
+  mutate(species_label = recode(species, `European Plum` = 'ep',
+                                `Japanese Plum` = 'jp',
+                                Pistachio = 'pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'jp', 'Pear', 'pi', 'Sweet Cherry')),
+         location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
+                           Meknes = 'Mekn.',
+                           Santomera = 'Santo.',
+                           Zaragoza = 'Zarag.'),
+         dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2)) %>% 
+  filter(!(species %in% c('Almond', 'Apple', 'Apricot')),
+         scenario_year == '2085') %>% 
+  ggplot(ggplot2::aes(y = cult_num)) +
+  # geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = -Inf, ymax = Inf,
+  #               fill = 'Time Window: "Thermal Risk"'), alpha = 0.3) +
+  geom_rect(aes(xmin = failure_hist, xmax = failure_rate, ymin = cult_num + dodge_low, ymax = cult_num + dodge_up, fill = ssp)) +
+  geom_point(aes(x = failure_rate, y = cult_num + ((dodge_low + dodge_up)/2),  col = ssp, fill = ssp), 
+             show.legend = FALSE, shape = 18) + 
+  geom_rect(aes(xmin = failure_hist - 1, xmax = failure_hist + 1, ymax = cult_num - 0.4, ymin = cult_num + 0.4, fill = 'Simulation 2020'),  size = 2) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species_label~location, scales = 'free_y', space = 'free_y') +
+  scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(values = c('black', "#56B4E9", "#009E73","#F0E442",  "#E69F00", 'grey70'))+
+  theme_bw(base_size = 15) +
+  scale_x_continuous(breaks = c(0, 50, 100), 
+                     labels = c('0%', '50%', '100%'),
+                     minor_breaks = c(0, 25, 50, 75, 100)) +
+  ggh4x::facetted_pos_scales(y = list(
+    species_label == 'ep' ~ ggplot2::scale_y_continuous(limits = c(53-0.5, 53+ 0.5), breaks = 53, labels = cult_num_df$cultivar[58]),
+    species_label == 'jp' ~ ggplot2::scale_y_continuous(limits = (c(52-0.5, 52+0.5)), breaks = 52, labels = cult_num_df$cultivar[59]),
+    species_label == 'Pear' ~ ggplot2::scale_y_continuous(limits = (c(37, 51)), breaks = 37:51, labels = cult_num_df$cultivar[74:60]),
+    species_label == 'pi' ~ ggplot2::scale_y_continuous(limits = (c(35-0.5, 36+0.5)), breaks = 35:36, labels = cult_num_df$cultivar[76:75]),
+    species_label == 'Sweet Cherry' ~ ggplot2::scale_y_continuous(limits = (c(1, 34)), breaks = 1:34, labels = cult_num_df$cultivar[110:77]))
+  ) +
+  theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  ylab('') +
+  xlab('Share of Predicted Flowering outside of Bloom Window') +
+  guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
+
+
+p1 + p2 + plot_layout(guides = 'collect') & ggplot2::theme(legend.position= 'bottom') 
+ggplot2::ggsave('figures/paper/change_failure_rate_2085.jpeg', device = 'jpeg',
+                height = 27, width = 31, units = 'cm')
+
+
+
+
+
+#summary plot change failure rate 
+
+fail_shift %>% 
+  mutate(col_fil = paste(ssp, scenario_year, sep = '_'),
+         col_fil = factor(col_fil, levels = c('ssp126_2050', 'ssp126_2085', 'ssp245_2050', 'ssp245_2085', 'ssp370_2050', 'ssp370_2085', 'ssp585_2050', 'ssp585_2085')),
+         species = stringr::str_to_title(species)) %>% 
+  mutate(species = recode(species, 
+                          `European Plum` = 'Europ Plum',
+                          `Japanese Plum` = 'Jap. Plum',
+                          `Sweet Cherry` = 'Sw. Cherry')) %>% 
+  ggplot(aes(x = species, y = change_fail, fill = col_fil)) +
+  geom_boxplot() +
+  ylab('Change in Predicted Flowering Outside\nBloom Time Window (%) compared to 2015') +
+  xlab('')+
+  scale_fill_manual(values = c('lightblue', 'steelblue', 'lightgreen', 'limegreen', 'darkgoldenrod1', 'darkorange', 'thistle', 'violetred'),
+                    breaks = c('ssp126_2050', 'ssp126_2085', 'ssp245_2050', 'ssp245_2085', 'ssp370_2050', 'ssp370_2085', 'ssp585_2050', 'ssp585_2085'),
+                    labels = c('SSP126 2050', 'SSP126 2085', 'SSP245 2050', 'SSP245 2085', 'SSP370 2050', 'SSP370 2085', 'SSP585 2050', 'SSP585 2085'), 
+                    name = 'Climate Change\nScenario and Year') +
+  facet_wrap( ~ location, ncol = 2) +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1), legend.position = 'right')
+ggsave('figures/paper/shift_median_failure_summarized.jpeg', height = 20, width = 30, units = 'cm', device = 'jpeg')
+
+
+
+
+
+fail_current <- read.csv('data/failure-rate_thermal-risk_current.csv')
+library(tidyverse)
+fail_current %>% 
+  filter(cultivar %in% cultivar_n) %>% 
+  filter(location == 'Zaragoza') %>% 
+  group_by(species) %>% 
+  summarise(med = median(failure_rate))
+
+fail_2105 <- read.csv('data/failure-rate_thermal-risk_2020-sim.csv')
+
+fail_2105 %>% 
+  filter(location == 'Sfax') %>% 
+  group_by(species) %>% 
+  summarize(med = median(failure_rate))
+
+fail_future <- read.csv('data/failure-rate_thermal-risk_future.csv')
+
+fail_future %>% 
+  filter(location == 'Sfax') %>% 
+  group_by(species, ssp, scenario_year) %>% 
+  summarise(med = median(failure_rate))
+
+
+###make the plot with change in predicted bloom date
+
+
+
+###make plot with change in predicted failure rate
+
+
+data.frame(a = 1, b = 1) %>% 
+  rename(dgdg = a)
+
+
 
 
 rm(list = ls())
