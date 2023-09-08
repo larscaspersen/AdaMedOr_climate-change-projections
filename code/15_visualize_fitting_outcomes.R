@@ -2,7 +2,7 @@
 
 library(chillR)
 library(tidyverse)
-library(LarsChill)
+#library(LarsChill)
 
 # source('code/utilities/save_fitting_list.R')
 # source('code/utilities/load_fitting_result.R')
@@ -17,19 +17,20 @@ species <- c('almond', 'apple', 'apricot', 'european_plum', 'japanese_plum',  'p
 #number of repititions
 r <- 10
 
-apricot_fit <- apple_fit <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <- almond_fit_old <- almond_with_sanotmera <-  list()
+apricot_fit <- apple_fit <- eplum_fit <- jplum_fit <- pistachio_fit <- cherry_fit <- almond_fit <- pear_fit <- almond_fit_old <- almond_with_sanotmera <- almond_with_sanotmera_v2 <-  list()
 
 for(i in 1:r){
-  apricot_fit[[i]] <- load_fitting_result('data/fitting/apricot/repeated_fitting_clean/', prefix = paste0('repeat', i, '_'))
-  eplum_fit[[i]] <- load_fitting_result('data/fitting/european_plum/', prefix = paste0('repeat', i, '_'))
-  jplum_fit[[i]] <- load_fitting_result('data/fitting/japanese_plum/', prefix = paste0('repeat', i, '_'))
-  pistachio_fit[[i]] <- load_fitting_result('data/fitting/pistachio/', prefix = paste0('repeat', i, '_'))
-  cherry_fit[[i]] <- load_fitting_result('data/fitting/sweet_cherry/repeated_fitting/', prefix = paste0('repeat', i, '_'))
-  almond_fit_old[[i]]  <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting/', prefix = paste0('repeat', i, '_'))
-  almond_fit[[i]] <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting_new_bounds', prefix = paste0('repeat', i, '_'))
-  almond_with_sanotmera[[i]]  <- load_fitting_result(path = 'data/fitting/almond/repeated_fitting_santomera_cleanly_saved/', prefix = paste0('repeat', i, '_'))
-  pear_fit[[i]] <- load_fitting_result('data/fitting/pear/', prefix = paste0('repeat', i, '_'))
-  apple_fit[[i]] <- load_fitting_result('data/fitting/apple/', prefix = paste0('repeat', i, '_'))
+  apricot_fit[[i]] <- LarsChill::load_fitting_result('data/fitting/apricot/repeated_fitting_clean/', prefix = paste0('repeat', i, '_'))
+  eplum_fit[[i]] <- LarsChill::load_fitting_result('data/fitting/european_plum/', prefix = paste0('repeat', i, '_'))
+  jplum_fit[[i]] <- LarsChill::load_fitting_result('data/fitting/japanese_plum/', prefix = paste0('repeat', i, '_'))
+  pistachio_fit[[i]] <- LarsChill::load_fitting_result('data/fitting/pistachio/', prefix = paste0('repeat', i, '_'))
+  cherry_fit[[i]] <- LarsChill::load_fitting_result('data/fitting/sweet_cherry/repeated_fitting/', prefix = paste0('repeat', i, '_'))
+  almond_fit_old[[i]]  <- LarsChill::load_fitting_result(path = 'data/fitting/almond/repeated_fitting/', prefix = paste0('repeat', i, '_'))
+  almond_fit[[i]] <- LarsChill::load_fitting_result(path = 'data/fitting/almond/repeated_fitting_new_bounds', prefix = paste0('repeat', i, '_'))
+  almond_with_sanotmera_v2[[i]] <- LarsChill::load_fitting_result(path = 'data/fitting/almond/repeated_fitting_santomera_v2_cleanly_saved/', prefix = paste0('repeat', i, '_'))
+  almond_with_sanotmera[[i]]  <- LarsChill::load_fitting_result(path = 'data/fitting/almond/repeated_fitting_santomera_cleanly_saved/', prefix = paste0('repeat', i, '_'))
+  pear_fit[[i]] <- LarsChill::load_fitting_result('data/fitting/pear/', prefix = paste0('repeat', i, '_'))
+  apple_fit[[i]] <- LarsChill::load_fitting_result('data/fitting/apple/', prefix = paste0('repeat', i, '_'))
 }
 
   
@@ -40,7 +41,7 @@ fit_list <- list('Apricot' = apricot_fit,
                  'Japanese Plum' = jplum_fit,
                  'Pistachio' = pistachio_fit,
                  'Sweet Cherry' = cherry_fit,
-                 'Almond' = almond_with_sanotmera,
+                 'Almond' = almond_with_sanotmera_v2,
                  'Pear' = pear_fit)
 
 
@@ -64,7 +65,7 @@ zaragoza_hourly <- stack_hourly_temps(zaragoza, latitude =  weather_stations$lat
 sfax_hourly <- stack_hourly_temps(sfax, latitude =  weather_stations$latitude[weather_stations$station_name == 'Sfax'])
 cieza_hourly <- stack_hourly_temps(cieza, latitude =  weather_stations$latitude[weather_stations$station_name == 'Cieza'])
 meknes_hourly <- stack_hourly_temps(meknes, latitude =  weather_stations$latitude[weather_stations$station_name == 'Meknes'])
-santomera_hourly <- stack_hourly_temps(meknes, latitude =  weather_stations$latitude[weather_stations$station_name == 'Santomera'])
+santomera_hourly <- stack_hourly_temps(santomera, latitude =  weather_stations$latitude[weather_stations$station_name == 'Santomera'])
 
 
 cka_hourly <- cka_hourly$hourtemps
@@ -110,6 +111,8 @@ master_pheno_split <- master_pheno_split %>%
   filter(!(species == 'Apple' & year == 1958),
          !(species == 'Pear' & year == 1958))
 
+master_almond_split_old <- read.csv('data/master_phenology_repeated_splits_old_almond.csv')
+
 #now I should be able to make forecast for each data point in the master pheno file
 
 
@@ -147,8 +150,8 @@ for(spec in names(fit_list)){
       sub_SeasonList <-  purrr::map2(sub$location, sub$year, function(loc, yr) SeasonList[[loc]][[as.character(yr)]])
       
       #predict bloom days
-      sub$pred <- return_predicted_days(par = convert_parameters(par), 
-                                          modelfn = custom_PhenoFlex_GDHwrapper, 
+      sub$pred <- LarsChill::return_predicted_days(par = LarsChill::convert_parameters(par), 
+                                          modelfn = LarsChill::custom_PhenoFlex_GDHwrapper, 
                                           SeasonList =sub_SeasonList)
       
       prediction_df <- rbind.data.frame(prediction_df,
@@ -163,100 +166,136 @@ for(spec in names(fit_list)){
 prediction_df$residual <- prediction_df$pred - prediction_df$pheno
 #maybe different order of data??
 
+
+write.csv(prediction_df, file = 'data/prediction_vs_observed.csv', row.names = FALSE)
+
 #add iqr to prediction data.frame
 iqr_df <- prediction_df %>% 
   group_by(species, cultivar, repetition) %>% 
   summarise(iqr = IQR(pheno))
 
+mean_obs_df <- prediction_df  %>% 
+  group_by(species, cultivar, repetition) %>% 
+  summarise(mean_pheno = mean(pheno))
+
 
 #now I can generate performance data
 performance <- prediction_df %>% 
   merge.data.frame(iqr_df, by = c('species', 'cultivar', 'repetition')) %>% 
-  dplyr::group_by(species, cultivar, repetition, split, iqr) %>% 
+  merge.data.frame(mean_obs_df, by = c('species', 'cultivar', 'repetition')) %>% 
+  dplyr::group_by(species, cultivar, repetition, split, iqr, mean_pheno) %>% 
   dplyr::summarise(rmse = RMSEP(predicted = pred, observed = pheno),
-            mean_bias = mean(pred - pheno)) %>% 
+            mean_bias = mean(pred - pheno),
+            nse = 1 - (sum( pheno - pred)^2 ) / sum( (pheno - mean(mean_pheno))^2 ) ) %>% 
   mutate(rpiq_adj = iqr / rmse)
 
-#save predictions and performance 
-write.csv(prediction_df, file = 'data/predicted_flowering_vs_observed.csv', row.names = FALSE)
-write.csv(performance, file = 'data/performance_fitted_models.csv', row.names = FALSE)
+write.csv(performance, 'data/performance_fitted_models.csv', row.names = FALSE)
+
+
+performance %>% 
+  filter(split == 'Validation') %>% 
+  ggplot(aes(y = species, x = nse)) +
+  geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  scale_y_discrete(limits = rev)+
+  ylab('') +
+  xlab('Nash-Sutcliff model efficiency coefficient') + 
+  geom_vline(xintercept = 0, linetype = 'dashed') +
+  coord_cartesian(xlim = c(-1, 1))+
+  #  ggsci::scale_fill_tron()+
+  #  scale_fill_manual(values = viridis::viridis(8))+
+  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
+  theme_bw()
+
+
+
+performance %>% 
+  filter(split == 'Validation') %>% 
+  ggplot(aes(y = species, x = rpiq_adj)) +
+  geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  scale_y_discrete(limits = rev)+
+  ylab('') +
+  xlab('Ratio of Performance to Interquartile Distance  (RPIQ) for Validation Data') + 
+  geom_vline(xintercept = 1, linetype = 'dashed') +
+  #  ggsci::scale_fill_tron()+
+  #  scale_fill_manual(values = viridis::viridis(8))+
+  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
+  theme_bw()
+
+performance %>% 
+  filter(split == 'Validation') %>% 
+  group_by(species) %>% 
+  summarise(rpiq_low = sum(rpiq_adj < 1) / n())
+
+
+
+########
+#table for publication
+########
+
+cult_drop <- master_pheno_split %>% 
+  filter(repetition == 1) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(n = n()) %>% 
+  filter(n < 20)
+
+
+performance %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species) %>% 
+  summarise(iqr_5_rpiq_adj = quantile(rpiq_adj, 0.05),
+            median_rpiq = median(rpiq_adj),
+            iqr_95_rpiq_adj = quantile(rpiq_adj, 0.95),
+            iqr_5_rmse = quantile(rmse, 0.05),
+            median_rmse = median(rmse),
+            iqr_95_rmse = quantile(rmse, 0.95),
+            share_small_rpiq = (sum(rpiq_adj < 1) / n())*100,
+            # iqr_5_nse = quantile(nse, 0.05),
+            # median_nse = median(nse),
+            # iqr_95_nse = quantile(nse, 0.95),
+            # share_small_nse = (sum(nse < 0) / n()) * 100,
+            iqr_5_bias = quantile(abs(mean_bias), 0.05),
+            median_bias = median(abs(mean_bias)),
+            iqr_95_bias = quantile(abs(mean_bias), 0.95),
+            n = n()
+            )
+
+
+#-------------------------------#
+
+
+#############################
+#comparison within a species
+############################
 
 
 performance %>% 
   filter(species == 'Almond') %>% 
-  ggplot(aes(y = cultivar, fill = split, x = rpiq_adj)) +
-  # geom_bar(stat = 'identity', position = 'dodge') +
-  geom_boxplot() +
-  theme_bw() +
-  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
-  #coord_cartesian(xlim = c(0, 10)) +
-  geom_vline(xintercept = 1, linetype = 'dashed') +
-  theme_bw(base_size = 15) +
-  scale_y_discrete(limits=rev)
-
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(median_rpiq = median(rpiq_adj)) %>% 
+  filter(median_rpiq >= 1.5)
 
 performance %>% 
-  filter(species == 'Apricot') %>% 
-  ggplot(aes(y = cultivar, fill = split, x = rpiq_adj)) +
-  # geom_bar(stat = 'identity', position = 'dodge') +
-  geom_boxplot() +
-  theme_bw() +
-  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
-  #coord_cartesian(xlim = c(0, 10)) +
-  geom_vline(xintercept = 1, linetype = 'dashed') +
-  theme_bw(base_size = 15) +
-  scale_y_discrete(limits=rev)
+  filter(species == 'Almond') %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(median_rpiq = median(rpiq_adj)) %>% 
+  filter(median_rpiq < 1.5 & median_rpiq >= 1)
 
 performance %>% 
-  filter(species == 'Sweet Cherry') %>% 
-  ggplot(aes(y = cultivar, fill = split, x = rpiq_adj)) +
-  # geom_bar(stat = 'identity', position = 'dodge') +
-  geom_boxplot() +
-  theme_bw() +
-  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
-  #coord_cartesian(xlim = c(0, 10)) +
-  geom_vline(xintercept = 1, linetype = 'dashed') +
-  theme_bw(base_size = 15) +
-  scale_y_discrete(limits=rev)
+  filter(species == 'Almond') %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(median_rpiq = median(rpiq_adj)) %>% 
+  filter(median_rpiq < 1)
 
 performance %>% 
-  filter(species == 'Japanese Plum') %>% 
-  ggplot(aes(y = cultivar, fill = split, x = rpiq_adj)) +
-  # geom_bar(stat = 'identity', position = 'dodge') +
-  geom_boxplot() +
-  theme_bw() +
-  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
-  #coord_cartesian(xlim = c(0, 10)) +
-  geom_vline(xintercept = 1, linetype = 'dashed') +
-  theme_bw(base_size = 15) +
-  scale_y_discrete(limits=rev)
-
-performance %>% 
-  filter(species == 'European Plum') %>% 
-  ggplot(aes(y = cultivar, fill = split, x = rpiq_adj)) +
-  # geom_bar(stat = 'identity', position = 'dodge') +
-  geom_boxplot() +
-  theme_bw() +
-  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
-  #coord_cartesian(xlim = c(0, 10)) +
-  geom_vline(xintercept = 1, linetype = 'dashed') +
-  theme_bw(base_size = 15) +
-  scale_y_discrete(limits=rev)
-
-performance %>% 
-  filter(species == 'Pistachio') %>% 
-  ggplot(aes(y = cultivar, fill = split, x = rpiq_adj)) +
-  # geom_bar(stat = 'identity', position = 'dodge') +
-  geom_boxplot() +
-  theme_bw() +
-  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
-  #coord_cartesian(xlim = c(0, 10)) +
-  geom_vline(xintercept = 1, linetype = 'dashed') +
-  theme_bw(base_size = 15) +
-  scale_y_discrete(limits=rev)
-
-performance %>% 
-  filter(species == 'Pear') %>% 
+  filter(species == 'Almond') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   ggplot(aes(y = cultivar, fill = split, x = rpiq_adj)) +
   # geom_bar(stat = 'identity', position = 'dodge') +
   geom_boxplot() +
@@ -269,6 +308,13 @@ performance %>%
 
 performance %>% 
   filter(species == 'Apple') %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar))
+
+
+performance %>% 
+  filter(species == 'Apple') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   ggplot(aes(y = cultivar, fill = split, x = rpiq_adj)) +
   # geom_bar(stat = 'identity', position = 'dodge') +
   geom_boxplot() +
@@ -279,34 +325,181 @@ performance %>%
   theme_bw(base_size = 15) +
   scale_y_discrete(limits=rev)
 
+performance %>% 
+  filter(species == 'Apricot') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  ggplot(aes(y = cultivar, fill = split, x = rpiq_adj)) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  geom_boxplot() +
+  theme_bw() +
+  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  #coord_cartesian(xlim = c(0, 10)) +
+  geom_vline(xintercept = 1, linetype = 'dashed') +
+  theme_bw(base_size = 15) +
+  scale_y_discrete(limits=rev)
 
-
-#look into the actual number of data that went into the fitting
-freq_input <- master_pheno_split %>% 
-  filter(repetition == 1) %>% 
+performance %>% 
+  filter(species == 'Apricot') %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   group_by(species, cultivar) %>% 
-  summarise(n = n())
+  summarise(median_rpiq = median(rpiq_adj)) %>% 
+  filter(median_rpiq < 1)
 
-enough_obs <- freq_input %>% 
-  filter(n >= 20)
+performance %>% 
+  filter(species == 'Apricot') %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(median_rpiq = median(rpiq_adj)) %>% 
+  filter(median_rpiq < 1.5 & median_rpiq >= 1)
 
-#2 runs of desmayo are really bad. why?
-#very high predictions. but maybe the function simply fails to convert predictions before 1st Jan to be shown in the proper way.
-#desmayo 3 or 7
+performance %>% 
+  filter(species == 'Apricot') %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(median_rpiq = median(rpiq_adj)) %>% 
+  filter(median_rpiq >= 1.5)
+
+performance %>% 
+  filter(species == 'Pear') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  ggplot(aes(y = cultivar, fill = split, x = rpiq_adj)) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  geom_boxplot() +
+  theme_bw() +
+  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  #coord_cartesian(xlim = c(0, 10)) +
+  geom_vline(xintercept = 1, linetype = 'dashed') +
+  theme_bw(base_size = 15) +
+  scale_y_discrete(limits=rev)
+
+performance %>% 
+  filter(species == 'Pear') %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(median_rpiq = median(rpiq_adj))
+
+performance %>% 
+  filter(species == 'Pistachio') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  ggplot(aes(y = cultivar, fill = split, x = rpiq_adj)) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  geom_boxplot() +
+  theme_bw() +
+  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  #coord_cartesian(xlim = c(0, 10)) +
+  geom_vline(xintercept = 1, linetype = 'dashed') +
+  theme_bw(base_size = 15) +
+  scale_y_discrete(limits=rev)
+
+performance %>% 
+  filter(species == 'Pistachio') %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(median_rpiq = median(rpiq_adj))
+
+performance %>% 
+  filter(species == 'Sweet Cherry') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  ggplot(aes(y = cultivar, fill = split, x = rpiq_adj)) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  geom_boxplot() +
+  theme_bw() +
+  #theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  #coord_cartesian(xlim = c(0, 10)) +
+  geom_vline(xintercept = 1, linetype = 'dashed') +
+  theme_bw(base_size = 15) +
+  scale_y_discrete(limits=rev)
+
+performance %>% 
+  filter(species == 'Sweet Cherry') %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(median_rpiq = median(rpiq_adj)) %>% 
+  filter(median_rpiq < 1.5)
+
+
+performance %>% 
+  filter(species == 'Sweet Cherry') %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  pull(cultivar) %>% 
+  unique() %>% 
+  length()
+
+bad_cult <- performance %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(median_rpiq = median(rpiq_adj)) %>% 
+  filter(median_rpiq < 1) %>% 
+  pull(cultivar)
+
+medium_cult <- performance %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(median_rpiq = median(rpiq_adj)) %>% 
+  filter(median_rpiq >= 1 & median_rpiq < 1.5) %>% 
+  pull(cultivar)
+
+good_cult <- performance %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(median_rpiq = median(rpiq_adj)) %>% 
+  filter(median_rpiq >= 1.5) %>% 
+  pull(cultivar)
+  
+
+master_pheno_split %>% 
+  filter(repetition == 1) %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(n_loc = length(unique(location))) %>% 
+  mutate(cult_type = ifelse(cultivar %in% good_cult, 
+                            yes = 'good_cult', 
+                            no = ifelse(cultivar %in% medium_cult, 
+                                        yes = 'medium_cult', 
+                                        no = 'bad_cult'))) %>% 
+  group_by(cult_type) %>% 
+  summarise(sum(n_loc > 1) / n())
+
+test <- master_pheno_split %>% 
+  filter(repetition == 1) %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(n_loc = length(unique(location))) %>% 
+  mutate(cult_type = ifelse(cultivar %in% good_cult, 
+                            yes = 'good_cult', 
+                            no = ifelse(cultivar %in% medium_cult, 
+                                        yes = 'medium_cult', 
+                                        no = 'bad_cult'))) %>% 
+  summarise(sum(n_loc > 1) / n())
+
+
+
+
+##############################################
+#figures of rpiq etc on a cultivar level
+#############################################
 
 
 median_df <- performance %>% 
-  filter(split == 'Calibration',
-         species %in% enough_obs$species,
-         cultivar %in% enough_obs$cultivar) %>% 
+  filter(split == 'Validation') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   group_by(species, cultivar) %>% 
   summarise(median_rpiq = median(rpiq_adj),
             median_rmse = median(rmse),
             median_bias = median(mean_bias))
 
 performance %>% 
-  filter(species %in% enough_obs$species,
-         cultivar %in% enough_obs$cultivar) %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   merge.data.frame(median_df, by = c('species', 'cultivar')) %>% 
   ggplot(aes(y = reorder(cultivar, median_rmse), fill = split, x = rmse)) +
   # geom_bar(stat = 'identity', position = 'dodge') +
@@ -317,13 +510,14 @@ performance %>%
   geom_vline(xintercept = 5, linetype = 'dashed') +
   theme_bw(base_size = 15) +
   scale_y_discrete(limits=rev) +
-  ylab('Cultivar (ordered by incrasing RMSE of calibration data)') +
+  ylab('Cultivar (ordered by incrasing RMSE of validation data)') +
   xlab('Root Mean Square Error in Bloom Prediction (Days)') +
   facet_grid(rows = vars(species), scales = 'free_y', space = "free")
 ggsave('figures/rmse_all_cult.jpeg', device = 'jpeg',
        height = 40, width = 20, units = 'cm')
 
 performance %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   merge.data.frame(median_df, by = c('species', 'cultivar')) %>% 
   ggplot(aes(y = reorder(cultivar, median_rpiq), fill = split, x = rpiq_adj)) +
   # geom_bar(stat = 'identity', position = 'dodge') +
@@ -333,13 +527,14 @@ performance %>%
   #coord_cartesian(xlim = c(0, 10)) +
   geom_vline(xintercept = 1, linetype = 'dashed') +
   theme_bw(base_size = 15) +
-  ylab('Cultivar (ordered by decrasing RPIQ of calibration data)') +
+  ylab('Cultivar (ordered by decrasing RPIQ of validation data)') +
   xlab('Ratio of Performance to Interquartile Distance') +
   facet_grid(rows = vars(species), scales = 'free_y', space = "free")
 ggsave('figures/rpiq_all_cult.jpeg', device = 'jpeg',
        height = 40, width = 20, units = 'cm')
 
 performance %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   merge.data.frame(median_df, by = c('species', 'cultivar')) %>% 
   ggplot(aes(y = reorder(cultivar, median_bias), fill = split, x = mean_bias)) +
   # geom_bar(stat = 'identity', position = 'dodge') +
@@ -354,44 +549,51 @@ ggsave('figures/mean_bias_cult.jpeg', device = 'jpeg',
        height = 40, width = 20, units = 'cm')
 
 
-#can I use the ensemble to make predictions? maybe use the rpiq of validation data as a weight for the prediction?
 
+#-----------------------------------------------------#
+
+
+
+#################################################
+#ensemble predictions
+################################################
 
 ensemble_prediction_df <- data.frame()
 
 for(spec in names(fit_list)){
-
-    cultivars <- names(fit_list[[spec]][[1]])
-    for(cult in cultivars){
-      
-      par_list <- purrr::map(fit_list[[spec]], cult)
-     
-      sub <- master_pheno_split %>% 
-        filter(species == spec, cultivar == cult, repetition == 1)
-      
-      sub_SeasonList <-  purrr::map2(sub$location, sub$year, function(loc, yr) SeasonList[[loc]][[as.character(yr)]])
-      
-      confidence <- performance %>%
-        filter(species == spec, cultivar == cult, split == 'Validation') %>% 
-        pull(rpiq_adj)
-        
-      
-      pred_out <- LarsChill::pheno_ensemble_prediction(par_list, confidence, temp = sub_SeasonList)
-
-      
-      sub$pred <- pred_out$predicted
-      sub$sd <- pred_out$sd
-      
-      ensemble_prediction_df <- rbind.data.frame(ensemble_prediction_df,
-                                                 sub)
-      
-
-    }
-
+  
+  cultivars <- names(fit_list[[spec]][[1]])
+  for(cult in cultivars){
+    
+    par_list <- purrr::map(fit_list[[spec]], cult)
+    
+    sub <- master_pheno_split %>% 
+      filter(species == spec, cultivar == cult, repetition == 1)
+    
+    sub_SeasonList <-  purrr::map2(sub$location, sub$year, function(loc, yr) SeasonList[[loc]][[as.character(yr)]])
+    
+    confidence <- performance %>%
+      filter(species == spec, cultivar == cult, split == 'Validation') %>% 
+      pull(rpiq_adj)
+    
+    
+    pred_out <- LarsChill::pheno_ensemble_prediction(par_list, confidence, temp = sub_SeasonList)
+    
+    
+    sub$pred <- pred_out$predicted
+    sub$sd <- pred_out$sd
+    
+    ensemble_prediction_df <- rbind.data.frame(ensemble_prediction_df,
+                                               sub)
+    
+    
+  }
+  
 }
 
 ensemble_prediction_df %>% 
   filter(species == 'Apricot') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   ggplot(aes(x = pheno, y = pred)) +
   geom_abline(slope = 1, linetype = 'dashed') +
   geom_point() + 
@@ -405,6 +607,7 @@ ggsave('figures/ensemble_prediction_apricot.jpeg',
 
 ensemble_prediction_df %>% 
   filter(species == 'Apple') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   ggplot(aes(x = pheno, y = pred)) +
   geom_abline(slope = 1, linetype = 'dashed') +
   geom_point() + 
@@ -415,10 +618,11 @@ ensemble_prediction_df %>%
   theme_bw(base_size = 15) 
 ggsave('figures/ensemble_prediction_apple.jpeg',
        height = 15, width = 20, units = 'cm', device = 'jpeg')
-  
+
 
 ensemble_prediction_df %>% 
   filter(species == 'Almond') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   ggplot(aes(x = pheno, y = pred)) +
   geom_abline(slope = 1, linetype = 'dashed') +
   geom_point() + 
@@ -432,6 +636,7 @@ ggsave('figures/ensemble_prediction_almond.jpeg',
 
 ensemble_prediction_df %>% 
   filter(species == 'Pear') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   ggplot(aes(x = pheno, y = pred)) +
   geom_abline(slope = 1, linetype = 'dashed') +
   geom_point() + 
@@ -446,6 +651,7 @@ ggsave('figures/ensemble_prediction_pear.jpeg',
 
 ensemble_prediction_df %>% 
   filter(species == 'Sweet Cherry') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   ggplot(aes(x = pheno, y = pred)) +
   geom_abline(slope = 1, linetype = 'dashed') +
   geom_point() + 
@@ -459,6 +665,7 @@ ggsave('figures/ensemble_prediction_cherry.jpeg',
 
 ensemble_prediction_df %>% 
   filter(species == 'Pistachio') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   ggplot(aes(x = pheno, y = pred)) +
   geom_abline(slope = 1, linetype = 'dashed') +
   geom_point() + 
@@ -472,6 +679,7 @@ ggsave('figures/ensemble_prediction_pistachio.jpeg',
 
 ensemble_prediction_df %>% 
   filter(species == 'European Plum') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   ggplot(aes(x = pheno, y = pred)) +
   geom_abline(slope = 1, linetype = 'dashed') +
   geom_point() + 
@@ -485,6 +693,7 @@ ggsave('figures/ensemble_prediction_european_plum.jpeg',
 
 ensemble_prediction_df %>% 
   filter(species == 'Japanese Plum') %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   ggplot(aes(x = pheno, y = pred)) +
   geom_abline(slope = 1, linetype = 'dashed') +
   geom_point() + 
@@ -512,6 +721,7 @@ ensemble_performance <- ensemble_prediction_df %>%
 
 
 ensemble_performance %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   ggplot(aes(y = reorder(cultivar, rmse), x = rmse)) +
   geom_bar(stat = 'identity', position = 'dodge') +
   theme_bw() +
@@ -527,6 +737,7 @@ ggsave('figures/rmse_ensemble.jpeg', device = 'jpeg',
        height = 40, width = 20, units = 'cm')
 
 ensemble_performance %>% 
+  filter(!(cultivar %in% cult_drop$cultivar)) %>% 
   ggplot(aes(y = reorder(cultivar, rpiq_adj), x = rpiq_adj)) +
   geom_bar(stat = 'identity', position = 'dodge') +
   theme_bw() +
@@ -539,6 +750,218 @@ ensemble_performance %>%
   facet_grid(rows = vars(species), scales = 'free_y', space = "free")
 ggsave('figures/rpiq_ensemble.jpeg', device = 'jpeg',
        height = 40, width = 20, units = 'cm')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+almond_fit_old
+#generate predictions
+
+for(i in 1:r){
+  
+  cultivars <- names(almond_fit_old[[i]])
+  for(cult in cultivars){
+    
+    
+    
+    #extract parameters
+    par <- almond_fit_old[[i]][[cult]]$xbest 
+    #add fixed parameters
+    par <- c(par[1:4], theta_star, par[5:8], Tc, par[9:10])
+    
+    #subset master file
+    sub <- master_almond_split_old %>% 
+      filter(cultivar == cult,
+             repetition == i) %>% 
+      mutate(species = 'almond_old') %>% 
+      rename(measurement_type  = flowering_type)
+    
+    #generate seasonlist
+    sub_SeasonList <-  purrr::map2(sub$location, sub$year, function(loc, yr) SeasonList[[loc]][[as.character(yr)]])
+    
+    #predict bloom days
+    sub$pred <- LarsChill::return_predicted_days(par = LarsChill::convert_parameters(par), 
+                                                 modelfn = LarsChill::custom_PhenoFlex_GDHwrapper, 
+                                                 SeasonList =sub_SeasonList)
+    
+    sub$residual <- sub$pred - sub$pheno
+    
+    prediction_df <- rbind.data.frame(prediction_df,
+                                      sub)
+
+  }
+}
+
+iqr_df <- prediction_df %>% 
+  group_by(species, cultivar, repetition) %>% 
+  summarise(iqr = IQR(pheno))
+
+
+#now I can generate performance data
+performance <- prediction_df %>% 
+  merge.data.frame(iqr_df, by = c('species', 'cultivar', 'repetition')) %>% 
+  dplyr::group_by(species, cultivar, repetition, split, iqr) %>% 
+  dplyr::summarise(rmse = RMSEP(predicted = pred, observed = pheno),
+                   mean_bias = mean(pred - pheno)) %>% 
+  mutate(rpiq_adj = iqr / rmse)
+
+
+performance %>% 
+  filter(split == 'Validation') %>% 
+  ggplot(aes(y = species, x = rpiq_adj)) +
+  geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  scale_y_discrete(limits = rev)+
+  ylab('') +
+  xlab('Ratio of Performance to Interquartile Distance  (RPIQ) for Validation Data') + 
+  geom_vline(xintercept = 1, linetype = 'dashed') +
+  #  ggsci::scale_fill_tron()+
+  #  scale_fill_manual(values = viridis::viridis(8))+
+  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
+  theme_bw()
+
+prediction_df %>% 
+  dplyr::filter(species == 'Almond',
+                repetition ==  1) %>% 
+  ggplot(aes(x = pheno, y = pred, shape = split, col = location)) +
+  geom_point() +
+  geom_abline(slope = 1, linetype = 'dashed') +
+  facet_wrap(~cultivar)
+
+prediction_df %>% 
+  dplyr::filter(species == 'almond_old',repetition == 1) %>% 
+  ggplot(aes(x = pheno, y = pred, shape = split, col = location)) +
+  geom_point() +
+  geom_abline(slope = 1, linetype = 'dashed') +
+  facet_wrap(~cultivar)
+
+
+
+fbest_df_almond_new <- purrr::map(almond_with_sanotmera, function(x){
+  
+  purrr::map_dbl(x, 'fbest') %>% 
+    unname() %>% 
+    data.frame() %>% 
+    setNames('fbest') %>% 
+    mutate(cultivar = names(x))
+}) %>% 
+  bind_rows(.id = 'repetition') %>% 
+  mutate(species = 'Almond')
+
+fbest_df_almond_old <- purrr::map(almond_fit_old, function(x){
+  
+  purrr::map_dbl(x, 'fbest') %>% 
+    unname() %>% 
+    data.frame() %>% 
+    setNames('fbest') %>% 
+    mutate(cultivar = names(x))
+}) %>% 
+  bind_rows(.id = 'repetition') %>% 
+  mutate(species = 'almond_old')
+
+performance %>% 
+  filter(species %in% c('Almond', 'almond_old')) %>% 
+  merge(rbind(fbest_df_almond_new,fbest_df_almond_old) , by = c('species', 'cultivar', 'repetition')) %>% 
+  #filter(split == 'Validation') %>% 
+  ggplot(aes(x = fbest, y = rpiq_adj, col = split)) +
+  geom_point() +
+  facet_grid(species~split)
+#text book example of overfitting
+
+
+#--> the only cultivars affected should be 
+#Achaak
+#Desmayo
+#Ferragnes
+#Malaguena
+#Marcona
+#Tuono
+
+#everything else should be the same
+
+performance %>% 
+  filter(species %in% c('Almond', 'almond_old'), 
+         split == 'Validation') %>%
+  ggplot(aes(x = rpiq_adj,  y = cultivar, fill = species)) +
+  geom_boxplot() +
+  scale_y_discrete(limits = rev)+
+  ylab('') +
+  xlab('Ratio of Performance to Interquartile Distance  (RPIQ) for Validation Data') + 
+  geom_vline(xintercept = 1, linetype = 'dashed') +
+  #  ggsci::scale_fill_tron()+
+  #  scale_fill_manual(values = viridis::viridis(8))+
+  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
+  theme_bw()
+
+
+
+
+
+
+
+#can I use the ensemble to make predictions? maybe use the rpiq of validation data as a weight for the prediction?
+
+
 
 
 
