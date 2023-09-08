@@ -19,18 +19,22 @@ adamedor %>%
   group_by(location) %>% 
   summarise(species = unique(species))
 
+stations <- read.csv('data/weather_ready/weather_station_phenological_observations.csv')
+
 stations$species <- c(paste0(c('Apricot', 'Pear', 'Sweet Cherry'), collapse = ', '),
                       paste0(c('Apple', 'European Plum', 'Japanese Plum', '\nPear', 'Sweet Cherry'), collapse = ', '),
                       paste0(c('Almond', 'Pistachio'), collapse = ', '),
                       'Apricot',
-                      paste0(c('Almond', 'Apple'), collapse = ', '))
+                      paste0(c('Almond', 'Apple'), collapse = ', '),
+                      'Almond')
 
 
 stations$label <- c(paste0('"', '~bold(Zaragoza)~\n', paste0(c('Apricot', 'Pear', 'Sweet*Cherry'), collapse = '*'), '"',  collapse = ''),
                     paste0('"', '~bold(Klein-Altendorf)~\n', paste0(c('Apple', 'European*Plum', 'Japanese*Plum', '\nPear', 'Sweet*Cherry'), collapse = '*'),'"', collapse = ''),
                     paste0('"', '~bold(Sfax)~\n', paste0(c('Almond', 'Pistachio'), collapse = '*'), '"', collapse = ''),
                     paste0('"', '~bold(Cieza)~\n', paste0(c('Apricot')), '"', collapse = ''),
-                    paste0('"', '~bold(Meknes)~\n', paste0(c('Almond', 'Apple'), collapse = '*'), '"', collapse = ''))
+                    paste0('"', '~bold(Meknes)~\n', paste0(c('Almond', 'Apple'), collapse = '*'), '"', collapse = ''),
+                    paste0('"', '~bold(Santomera)~\n', paste0(c('Almond')), '"', collapse = ''))
 
 
 
@@ -43,19 +47,23 @@ stations$label <- c(paste0('"', '~bold(Zaragoza)~\n', paste0(c('Apricot', 'Pear'
 library("ggrepel")
 library("ggspatial")
 
+world <- ne_countries(scale = 'medium', returnclass = 'sf')
+
 ggplot(data = world) +
   geom_sf() +
   geom_point(data = stations, aes(x = longitude, y = latitude), size = 3, 
              shape = 23, fill = "darkred") +
   geom_label_repel(data = stations, aes(x = longitude, y = latitude, label = station_name),
                   fontface = "bold",
-                  nudge_x = c(-2, -3, -1.5, -1.5, -1.8), min.segment.length = 20,
+                  nudge_x = c(-2, -3, -1.5, -1.5, -1.8, 1.5), 
+                  nudge_y = c(0, 0, 0, 0, 0, 0.05),
+                  min.segment.length = 20,
                   fill = "#FFFFFFAA", label.size = NA) +
   # geom_text_repel(data = stations, aes(x = longitude, y = latitude, label = station_name), 
   #                 fontface = "bold", position = position_dodge()) +
   geom_label_repel(data = stations, aes(x = longitude, y = latitude, label = species), 
-                  nudge_x = c(-2, -3, -1.5, -1.5, -1.8), 
-                  nudge_y = c(-0.70, -1.1, -0.70, -0.70, -0.70), min.segment.length = 20, fill = "#FFFFFFAA", label.size = NA) +
+                  nudge_x = c(-2, -3, -1.5, -1.5, -1.8, 1.5), 
+                  nudge_y = c(-0.70, -1.1, -0.70, -0.70, -0.70, -0.7), min.segment.length = 20, fill = "#FFFFFFAA", label.size = NA) +
   coord_sf(xlim = c(-12, 12), ylim = c(28, 54), expand = FALSE) +
   xlab('Longitude') +
   ylab('Latitude')+
@@ -68,6 +76,14 @@ ggplot(data = world) +
 ggsave('figures/overview_map.jpeg', height = 15, width = 10, units = 'cm', device = 'jpeg')
 
 
+
+
+santomera <- read.csv('data/weather_ready/murcia_clean.csv')
+
+santomera %>% 
+  filter(Year >= 1990, Year <= 2020) %>% 
+  summarise(mean_Tmin = mean(Tmin),
+            mean_Tmax = mean(Tmax))
 
 
 # ggplot(data = world) +
