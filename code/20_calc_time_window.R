@@ -1,13 +1,3 @@
-#calculate time window
-
-unique(adamedor$location)
-unique(adamedor$species)
-
-adamedor %>% 
-  group_by(species) %>% 
-  summarise(n_cult = length(unique(cultivar))) %>% 
-  summarise(ncult = sum(n_cult))
-
 library(tidyverse)
 library(ggplot2)
 #library(readr)
@@ -16,9 +6,454 @@ library(chillR)
 # install_github("larscaspersen/addition_chillR")
 library(LarsChill)
 
+#---------------------------------------------#
+#decide on padding based on the error type 1 and type 2
+#---------------------------------------------#
+
+#make predictions for the actual weather data
+cka <- read.csv('data/weather_ready/cka_clean.csv') %>% 
+  filter(Year < 2022)
+cieza <- read.csv('data/weather_ready/cieza_clean_patched.csv')
+sfax <- read.csv('data/weather_ready/sfax_clean.csv')
+meknes <- read.csv('data/weather_ready/meknes_clean.csv')
+zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv') %>% 
+  filter(Year < 2022)
+santomera <- read.csv('data/weather_ready/murcia_clean.csv')
+
+
+weather_list_obs <- list('Klein-Altendorf' = cka,
+                         'Cieza' = cieza,
+                         'Zaragoza' = zaragoza,
+                         'Sfax' = sfax,
+                         'Meknes' = meknes,
+                         'Santomera' = santomera)
+weather_list_pred <- weather_list_obs
+
 adamedor <- read.csv('data/combined_phenological_data_adamedor_clean.csv') %>% 
   filter(!(species == 'Apple' & location == 'Klein-Altendorf' & cultivar == 'Elstar' & year %in% c(2008, 2010)),
          !(species == 'Apricot' & location == 'Cieza' & cultivar == 'Sublime' & year == 2014))
+
+
+frost_threshold <- 0
+heat_threshold <- 32
+observation_df <- adamedor %>% 
+  filter(!(species %in% c( 'Peach', 'Olive')))
+
+pad <- seq(0, 0.1, by = 0.01)
+therm_windows <- purrr::map(pad, function(p){
+  
+  purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) LarsChill::get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
+                                                                                                                             weather_list_pred = weather_list_obs, 
+                                                                                                                             observation_df = observation_df, 
+                                                                                                                             frost_threshold = frost_threshold, 
+                                                                                                                             heat_threshold = heat_threshold, 
+                                                                                                                             target_col_obs = x,
+                                                                                                                             padding = p)) %>% 
+    bind_rows() %>% 
+    mutate(padding = p)
+}) %>% 
+  bind_rows()
+
+
+pheno_current <-  read.csv('data/projected_bloomdates_ensemble_observed_weather.csv') %>% 
+  mutate(species = tolower(species),
+         flowering_type = ifelse(species %in% c('apple', 'european plum', 'japanese plum'), yes = 'begin_flowering_f5', no = 'flowering_f50')) 
+
+
+
+master_pheno <- read.csv('data/master_phenology_repeated_splits.csv') %>% 
+  mutate(species = tolower(species)) %>% 
+  filter(repetition == 1) %>% 
+  merge(pheno_current, by.x = c('species', 'cultivar', 'location', 'measurement_type', 'year'), by = c('species', 'cultivar', 'location', 'flowering_type', 'scenario_year'),all.x = TRUE, all.y = FALSE) %>% 
+  mutate(flowering_type = measurement_type) %>% 
+  na.omit()
+
+
+okabe <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7",'grey40' )
+
+
+err1_df <- therm_windows %>% 
+  mutate(species = tolower(species)) %>% 
+  merge(master_pheno, by = c('species', 'flowering_type', 'location')) %>% 
+  mutate(failure = pheno_predicted < min_doy_padded | pheno_predicted > max_doy_padded) %>% 
+  group_by(species, cultivar, location, padding) %>% 
+  summarise(failure_rate = sum(failure) / n())
+
+err1_plot <- err1_df %>% 
+  mutate(failure_rate = failure_rate * 100,
+         padding = padding * 100) %>% 
+  group_by(species, location, padding) %>% 
+  summarise(mean_fail_rate = mean(failure_rate),
+            sd_fail_rate = sd(failure_rate)) %>% 
+  ungroup() %>% 
+  mutate(species_label = recode(species, `european plum` = "europ. plum", `japanese plum` = "jap. plum"),
+         species_label = str_to_title(species_label)) %>% 
+  ggplot(aes(x = padding, y = mean_fail_rate)) +
+  geom_point(aes(col = location), position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = mean_fail_rate - sd_fail_rate, ymax = mean_fail_rate + sd_fail_rate,
+                    col = location), position = position_dodge(width = 0.5))+
+  geom_line(aes(col = location), position = position_dodge(width = 0.5))+
+  coord_cartesian(ylim = c(0,112))+
+  facet_grid(~species_label) +
+  scale_x_continuous(breaks = c(0, 5, 10), minor_breaks = seq(0, 10, by = 1)) +
+  scale_y_continuous(breaks = c(0, 20, 40, 60, 80, 100)) +
+  ylab('Type 1 Error (%)') +
+  xlab('') +
+  scale_color_manual(breaks = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'),
+                     labels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'),
+                       values = okabe) +
+  theme_bw(base_size = 15) 
+
+#fail rate never higher than 3%, no failure at padding of 3% present
+#only failures in meknes almond and apple
+
+#look at type 2 error
+
+
+
+err2_df <- therm_windows %>% 
+  mutate(species = tolower(species)) %>% 
+  merge(pheno_current, by = c('species', 'flowering_type', 'location')) %>% 
+  mutate(failure = pheno_predicted < min_doy_padded | pheno_predicted > max_doy_padded) %>% 
+  group_by(species, cultivar, location, padding) %>% 
+  summarise(failure_rate = sum(failure) / n()) %>% 
+  filter((species %in% c('apricot', 'apple', 'european plum', 'japanese plum', 'pear', 'sweet cherry') & location == 'Sfax') |
+           (species %in% c('almond', 'pistachio') & location %in% c('Klein-Altendorf', 'Zaragoza'))) 
+
+test <- err2_df %>% 
+  group_by(species, location, padding) %>% 
+  summarise(mean_fail_rate = mean(failure_rate),
+            sd_fail_rate = sd(failure_rate))
+
+err2_plot <- err2_df %>% 
+  mutate(failure_rate = failure_rate * 100,
+         padding = padding * 100) %>% 
+  group_by(species, location, padding) %>% 
+  summarise(mean_fail_rate = mean(failure_rate),
+            sd_fail_rate = sd(failure_rate)) %>% 
+  ungroup() %>% 
+  mutate(species_label = recode(species, `european plum` = "europ. plum", `japanese plum` = "jap. plum"),
+         species_label = str_to_title(species_label)) %>% 
+  ggplot(aes(x = padding, y = mean_fail_rate)) +
+  geom_point(aes(col = location), position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = mean_fail_rate - sd_fail_rate, ymax = mean_fail_rate + sd_fail_rate,
+                    col = location), position = position_dodge(width = 0.5))+
+  geom_line(aes(col = location), position = position_dodge(width = 0.5))+
+  coord_cartesian(ylim = c(0,112))+
+  facet_grid(~species_label) +
+  scale_x_continuous(breaks = c(0, 5, 10), minor_breaks = seq(0, 10, by = 1)) +
+  scale_y_continuous(breaks = c(0, 20, 40, 60, 80, 100)) +
+  scale_color_manual(breaks = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'), 
+                     labels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'),
+                     values = okabe) +
+  ylab('Predicted Failure Rate of Bloom (%)') +
+  xlab('Added Thermal Risk Tolerance (%)') +
+  theme_bw(base_size = 15) +
+  guides(colour = "none")
+#--> take padding of 3% and make this the standard. it minimizes the type 1 error and does not strongly increase the type 2 error
+
+library(patchwork)
+
+design <- 
+  "
+A
+B
+"
+
+list(err1_plot, err2_plot) |>
+  wrap_plots() +
+  plot_layout(guides = 'collect', design = design) & theme(legend.position= 'bottom') 
+ggsave('figures/effect_padding_errrortype.jpeg', height = 20, width = 30, units = 'cm', device = 'jpeg')
+
+
+
+#choose 3% padding 
+
+
+
+
+#-------------------#
+#make the error plot of for 3% padding
+#-------------------#
+
+thermal_time_window <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) LarsChill::get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
+                                                                                                         weather_list_pred = weather_list_obs, 
+                                                                                                         observation_df = observation_df, 
+                                                                                                         frost_threshold = frost_threshold, 
+                                                                                                         heat_threshold = heat_threshold, 
+                                                                                                         target_col_obs = x,
+                                                                                                         padding = 0.03)) %>% 
+  bind_rows()
+
+
+err1_df <- thermal_time_window %>% 
+  mutate(species = tolower(species)) %>% 
+  merge(master_pheno, by = c('species', 'flowering_type', 'location')) %>% 
+  mutate(failure = pheno_predicted < min_doy_padded | pheno_predicted > max_doy_padded) %>% 
+  group_by(species, cultivar, location) %>% 
+  summarise(failure_rate = (sum(failure) / n())*100 ) %>% 
+  mutate(failure_type = 'Type I')
+
+err2_df <- thermal_time_window %>% 
+  mutate(species = tolower(species)) %>% 
+  merge(pheno_current, by = c('species', 'flowering_type', 'location')) %>% 
+  mutate(failure = pheno_predicted < min_doy_padded | pheno_predicted > max_doy_padded) %>% 
+  group_by(species, cultivar, location) %>% 
+  summarise(failure_rate = (sum(failure) / n())*100 ) %>% 
+  filter((species %in% c('apricot', 'apple', 'european plum', 'japanese plum', 'pear', 'sweet cherry') & location == 'Sfax') |
+           (species %in% c('almond', 'pistachio') & location %in% c('Klein-Altendorf', 'Zaragoza'))) %>% 
+  mutate(failure_type = 'Type II')
+
+
+err1_plot <- err1_df %>% 
+  mutate(species = stringr::str_to_title(species),
+         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))) %>% 
+  mutate(species = recode(species, `European Plum` = 'Europ. Plum',
+                          `Japanese Plum` = 'Jap. Plum')) %>% 
+  ggplot(aes(x = species, y = failure_rate, fill = species)) +
+  geom_boxplot() +
+  ylim(c(0,100))+
+  ylab('Type 1 Error (%)') +
+  xlab('') +
+  facet_grid(~location, scales = 'free_x', space = 'free_x') +
+  scale_fill_manual(values = okabe) +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, hjust=1))
+
+err2_plot <- err2_df %>% 
+  mutate(species = stringr::str_to_title(species),
+         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))) %>% 
+  mutate(species = recode(species, `European Plum` = 'Europ. Plum',
+                          `Japanese Plum` = 'Jap. Plum')) %>% 
+  ggplot(aes(x = species, y = failure_rate, fill = species)) +
+  geom_boxplot() +
+  ylim(c(0,100))+
+  ylab('Predicted Failure Rate of Bloom (%)') +
+  xlab('')+
+  scale_fill_manual(values = okabe) +
+  facet_grid(~location, scales = 'free_x', space = 'free_x') +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, hjust=1))
+
+
+design <- 
+  "
+A
+B
+"
+
+list(err1_plot, err2_plot) |>
+  wrap_plots() +
+  plot_layout(guides = 'collect', design = design) &
+  plot_annotation(tag_levels = 'A') & 
+  theme(legend.position= 'none') 
+ggsave('figures/paper/error_types.jpeg', height = 20, width = 30, units = 'cm', device = 'jpeg')
+
+
+#-------------------------------#
+#Calculate Failure Rate For Each Species x Cultivar
+#-------------------------------#
+
+
+#observed weather
+failure_df_current <- thermal_time_window %>% 
+  mutate(species = tolower(species)) %>% 
+  merge(pheno_current, by = c('species', 'flowering_type', 'location')) %>% 
+  mutate(failure = pheno_predicted < min_doy_padded | pheno_predicted > max_doy_padded) %>% 
+  group_by(species, cultivar, location) %>% 
+  summarise(failure_rate = (sum(failure) / n())*100 )
+
+
+#modelled 2020
+pheno_2020 <- read.csv('data/projected_bloomdates_ensemble_historic_scenarios.csv') %>% 
+  mutate(species = tolower(species))
+
+#make time window based on 2020 weather
+hist_gen_weather <- chillR::load_temperature_scenarios('data/hist-sim-weather/', prefix = 'hist_gen_2015')
+
+#adjust the column names
+for(i in 1:length(hist_gen_weather)){
+  colnames(hist_gen_weather[[i]]) <- c('DATE', 'Year', 'Month', 'Day', 'nodata', 'Tmin', 'Tmax')
+}
+
+#calculate time window for 2020 conditions
+thermal_time_window_2020 <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) LarsChill::get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
+                                                                                                                                weather_list_pred = hist_gen_weather, 
+                                                                                                                                observation_df = observation_df, 
+                                                                                                                                frost_threshold = frost_threshold, 
+                                                                                                                                heat_threshold = heat_threshold, 
+                                                                                                                                target_col_obs = x,
+                                                                                                                                padding = 0.03)) %>% 
+  bind_rows() %>% 
+  mutate(species = tolower(species))
+
+#calculate failure rates
+failure_df_2020 <- thermal_time_window_2020 %>% 
+  merge(pheno_2020, by = c('species', 'location', 'flowering_type')) %>% 
+  mutate(failure = pheno_predicted < min_doy_padded | pheno_predicted > max_doy_padded) %>% 
+  group_by(species, cultivar, location) %>% 
+  summarise(failure_rate = (sum(failure) / n())*100 )
+
+
+
+
+#------------------------------#
+#failure rate future conditions
+#------------------------------#
+
+rm(err2_df, err1_df, err1_plot, err2_plot, adamedor, hist_gen_weather, master_pheno, pheno_2020, pheno_current,
+   test, therm_windows, thermal_time_window, thermal_time_window_2020)
+
+#read the future pheno data
+pheno_future <- read.csv('data/projected_bloomdates_ensemble.csv')
+
+#read the future weather data
+future_weather_list <- chillR::load_temperature_scenarios('data/future_weather/', prefix = '')
+
+
+#I need bloom windows for each ssp - gcm - time combination
+location_vec <- names(future_weather_list) %>% 
+  stringr::str_split('_') %>% 
+  purrr::map_chr(1)
+
+ssp_vec <- names(future_weather_list) %>% 
+  stringr::str_split('_') %>% 
+  purrr::map_chr(2) %>% 
+  stringr::str_split('\\.') %>% 
+  purrr::map_chr(1)
+
+gcm_vec <- names(future_weather_list) %>% 
+  stringr::str_split('_') %>% 
+  purrr::map_chr(2) %>% 
+  stringr::str_split('\\.') %>% 
+  purrr::map_chr(2)
+
+time_vec <- names(future_weather_list) %>% 
+  stringr::str_split('_') %>% 
+  purrr::map_chr(2) %>% 
+  stringr::str_split('\\.') %>% 
+  purrr::map_chr(3)
+
+
+future_failure_df <- data.frame()
+
+for(ssp in unique(ssp_vec)){
+  #ssp <- 'ssp126'
+  for(gcm in unique(gcm_vec)){
+    #gcm <- 'CAS-ESM2-0'
+    for(time in unique(time_vec)){
+      #time <- '2085'
+      
+      #which ones to select
+      select_element <- (ssp_vec == ssp) & (gcm_vec == gcm) & (time_vec == time)
+      
+      #bind the correct elements to a list
+      weather_list_pred <- future_weather_list[select_element]  
+      names(weather_list_pred) <- location_vec[select_element]
+      
+      #calculate thermal time window
+      thermal_time_window <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) LarsChill::get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
+                                                                                                               weather_list_pred = weather_list_pred, 
+                                                                                                               observation_df = observation_df, 
+                                                                                                               frost_threshold = frost_threshold, 
+                                                                                                               heat_threshold = heat_threshold, 
+                                                                                                               target_col_obs = x,
+                                                                                                               padding = 0.03)) %>% 
+        bind_rows() %>% 
+        mutate(gcm = gcm,
+               ssp = ssp,
+               scenario_year = time,
+               species = tolower(species))
+      
+      #calculate failure rate
+      fail_df <- pheno_future %>% 
+        separate(species_cultivar, into = c('species', 'cultivar'), sep = '_') %>% 
+        mutate(species = tolower(species)) %>% 
+        merge(thermal_time_window, by = c('species', 'location', 'gcm', 'ssp', 'scenario_year'), all.y = TRUE) %>% 
+        na.omit() %>% 
+        mutate(failure = pheno_predicted < min_doy_padded | pheno_predicted > max_doy_padded) %>% 
+        group_by(species, cultivar, location) %>% 
+        summarise(failure_rate = (sum(failure) / n())*100 ) %>% 
+        mutate(ssp = ssp,
+               gcm = gcm,
+               scenario_year = time)
+      
+      #append to the overall data.frame
+      future_failure_df <- rbind(future_failure_df, fail_df)
+      
+      
+      
+    }
+  }
+}
+
+write.csv(future_failure_df, 'data/failure-rate_thermal-risk_future.csv', row.names = FALSE)
+write.csv(failure_df_current, 'data/failure-rate_thermal-risk_current.csv', row.names = FALSE)
+write.csv(failure_df_2020, 'data/failure-rate_thermal-risk_2020-sim.csv', row.names = FALSE)
+
+#unique(future_failure_df$species)
+
+#save the failure rates in files
+#make the final figures in the figures script
+
+
+
+
+unique(thermal_time_window_2020$species)
+unique(pheno_2020$species)
+
+
+
+  ggplot(aes(x = pheno_predicted, y = cultivar)) +
+  geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = -Inf, ymax = Inf,
+                fill = '"Sudoku"')) +
+  geom_point(alpha = 0.2) +
+  scale_fill_manual(values = 'lightsteelblue') +
+  facet_grid(species~location, scales = 'free_y', space = 'free_y') +
+  
+  theme_bw(base_size = 15) +
+  #theme(legend.title = 'Method to construct\ntime window') +
+  guides(fill=guide_legend(title="Method to construct\ntime window")) +
+  coord_cartesian(xlim = c(0, 365))
+ggsave(filename = 'figures/timewindow_sudoku_current.jpeg',
+       height = 40, width = 30, units = 'cm', device = 'jpeg')
+
+
+
+
+
+
+
+
+
+
+
+# almond_sub <- adamedor %>% 
+#   filter(species == 'Almond')
+# 
+# almond_sub %>% 
+#   dplyr::select(species, cultivar, location, year, begin_flowering_f5) %>% 
+#   na.omit() %>% 
+#   group_by(species, cultivar) %>% 
+#   summarise(n = n()) %>% 
+#   filter(n >= 20) %>% 
+#   summarise(n = sum(n))
+# 
+# almond_sub %>% 
+#   dplyr::select(species, cultivar, location, year, flowering_f50) %>% 
+#   na.omit() %>% 
+#   group_by(species, cultivar) %>% 
+#   summarise(n = n()) %>% 
+#   filter(n >= 20) %>% 
+#   summarise(n = sum(n))
+# 
+# 
+# #calculate time window
+# adamedor <- read.csv('data/combined_phenological_data_adamedor_clean.csv') %>% 
+#   filter(!(species == 'Apple' & location == 'Klein-Altendorf' & cultivar == 'Elstar' & year %in% c(2008, 2010)),
+#          !(species == 'Apricot' & location == 'Cieza' & cultivar == 'Sublime' & year == 2014))
+
+
 
 flower_summarized <- adamedor %>% 
   group_by(species, location) %>% 
@@ -41,28 +476,16 @@ flower_summarized <- adamedor %>%
                           `Japanese plum` = "Japanese Plum") ) %>% 
   mutate(upper = mean + max_dist,
          lower = mean - max_dist) %>% 
-  dplyr::filter(location %in% c('Sfax', 'Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf'),
+  dplyr::filter(location %in% c('Sfax', 'Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf', 'Santomera'),
                 !(species %in% c('Peach', 'Olive'))) %>% 
-  mutate(location = factor(location, levels = c('Cieza', 'Zaragoza', 'Meknes', 'Klein-Altendorf', 'Sfax'))) %>% 
+  mutate(location = factor(location, levels = c('Klein-Altendorf','Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))) %>% 
   na.omit()
-  
 
 source('code/utilities/time_window_translation.R')
 
-f_mean <- est_phen_gaps(target_df = flower_summarized, target_col = 'mean', split_col = 'flowering_type')
-f_sd <- est_phen_gaps(target_df = flower_summarized, target_col = 'sd', split_col = 'flowering_type')
 f_lower <- est_phen_gaps(target_df = flower_summarized, target_col = 'lower', split_col = 'flowering_type')
 f_upper <- est_phen_gaps(target_df = flower_summarized, target_col = 'upper', split_col = 'flowering_type')
 
-f_lower %>% 
-  ggplot(aes(x = location, y = value)) +
-  geom_point() +
-  facet_grid(flowering_type~species)
-
-f_upper %>% 
-  ggplot(aes(x = location, y = value)) +
-  geom_point() +
-  facet_grid(flowering_type~species)
 
 #maybe take median and then look how the time windows would be
 
@@ -76,143 +499,12 @@ f_upper_sum <- f_upper %>%
   summarise(upper = median(value),
             upper_plus = quantile(value, 0.75, na.rm = TRUE))
 
-timewindow_df <- merge.data.frame(f_lower_sum, f_upper_sum, by = c('species', 'location', 'flowering_type', 'source'))
-timewindow_df$col <- ifelse(timewindow_df$source == 'observed', 
-                            yes = 'grey70', 
-                            no = ifelse(timewindow_df$source == 'deg_1', 
-                                        yes = 'lightgreen', 
-                                        no = ifelse(timewindow_df$source == 'deg_2', 
-                                                    yes = 'lightsteelblue',
-                                                    no = 'lightsalmon')))
+transfer_ranges_df <- merge.data.frame(f_lower_sum, f_upper_sum, by = c('species', 'location', 'flowering_type', 'source'))
 
-timewindow_df <- timewindow_df %>% 
-  na.omit() %>% 
-  mutate(loc = as.numeric(factor(location, levels = loc_order)),
-         species = tolower(species))
-
-
-loc_order <- c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Meknes', 'Sfax')
-
-
-flower_data <- adamedor %>% 
-  dplyr::filter(location %in% c('Sfax', 'Meknes', 'Cieza', 'Zaragoza', 'Klein-Altendorf'),
-                !(species %in% c('Peach', 'Olive'))) %>% 
-  mutate(begin_flowering_f5 = lubridate::yday(begin_flowering_f5), 
-         flowering_f50 = lubridate::yday(flowering_f50),
-         loc = as.numeric(factor(location, levels = loc_order)),
-         species = tolower(species)) %>% 
-  dplyr::select(species, location, loc, begin_flowering_f5, flowering_f50) %>% 
-  reshape2::melt(id.vars = c('species', 'location', 'loc'), variable.name = 'flowering_type')
-
-
-
-p1 <- timewindow_df %>% 
-  filter(source == 'observed') %>% 
-  ggplot(aes(x = loc)) +
-  geom_point(data = flower_data, aes(x = loc, y = value), col = 'grey20', position = 'jitter', alpha = 0.2) +
-  geom_errorbar(aes(ymin = lower, ymax = upper, color = source)) +
-  scale_x_continuous(breaks = 1:5, labels = loc_order) +
-  scale_color_manual(breaks = c('observed', 'deg_1', 'deg_2', 'deg_3'), values = c('grey20', 'palegreen4', 'steelblue', 'salmon')) +
-  facet_grid(flowering_type~species) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
-
-p1
-ggsave(plot = p1, 'figures/timewindow_sudoku_obs.jpeg', height = 15, width = 20, units = 'cm', device = 'jpeg')
-
-
-deg_1_points <- f_lower %>% 
-  rbind(f_upper) %>% 
-  filter(source == 'deg_1') %>% 
-  mutate(loc = as.numeric(factor(location, levels = loc_order)),
-         species = tolower(species))
-
-
-p2 <- p1 +
-  geom_point(data = deg_1_points, aes(x = loc, y = value), col = 'palegreen4', position = 'jitter', alpha = 0.3) +
-  geom_errorbar(data = timewindow_df[timewindow_df$source == 'deg_1', ], aes(ymin = lower, ymax = upper, color = source)) 
-
-ggsave(plot = p2, 'figures/timewindow_sudoku_deg1.jpeg', height = 15, width = 20, units = 'cm', device = 'jpeg')
-
-
-deg_2_points <- f_lower %>% 
-  rbind(f_upper) %>% 
-  filter(source == 'deg_2') %>% 
-  mutate(loc = as.numeric(factor(location, levels = loc_order)),
-         species = tolower(species))
-
-p3 <- p2 +
-  geom_point(data = deg_2_points, aes(x = loc, y = value), col = 'steelblue', position = 'jitter', alpha = 0.3) +
-    geom_errorbar(data = timewindow_df[timewindow_df$source == 'deg_2', ], aes(ymin = lower, ymax = upper, color = source)) 
-p3
-ggsave(plot = p3, 'figures/timewindow_sudoku_deg2.jpeg', height = 15, width = 20, units = 'cm', device = 'jpeg')
-
-
-deg_3_points <- f_lower %>% 
-  rbind(f_upper) %>% 
-  filter(source == 'deg_3') %>% 
-  mutate(loc = as.numeric(factor(location, levels = loc_order)),
-         species = tolower(species))
-
-p4 <- p3 +
-  geom_point(data = deg_3_points, aes(x = loc, y = value), col = 'salmon', position = 'jitter', alpha = 0.3) +
-  geom_errorbar(data = timewindow_df[timewindow_df$source == 'deg_3', ], aes(ymin = lower, ymax = upper, color = source)) 
-p4
-ggsave(plot = p4, 'figures/timewindow_sudoku_deg3.jpeg', height = 15, width = 20, units = 'cm', device = 'jpeg')
-
-
-
-
-timewindow_df %>% 
-  mutate(loc = as.numeric(factor(location))) %>% 
-  ggplot(aes(x = loc, fill = source)) +
-  geom_rect(aes(ymax = upper_plus, ymin = lower_plus, xmin = loc- 0.2, xmax = loc + 0.2), col = 'grey10', fill = 'grey70') +
-  geom_rect(aes(ymax = upper, ymin = lower, xmin = loc- 0.2, xmax = loc + 0.2), col = 'grey10') +
-  geom_point(data = f_lower, aes(x = as.numeric(as.factor(location)), y = value), col = 'grey30') +
-  geom_point(data = f_upper, aes(x = as.numeric(as.factor(location)), y = value), col = 'grey30') +
-  scale_fill_manual(breaks = c('observed', 'deg_1', 'deg_2', 'deg_3'), values = c('grey50', 'palegreen4', 'steelblue', 'salmon')) +
-  scale_x_continuous(breaks = 1:5, labels = c('Cieza', 'Zaragoza', 'Meknes', 'Klein-Altendorf', 'Sfax')) +
-  facet_grid(flowering_type~species)
-
-
-
-
-#how the hell should I establish relationship with flowering time and frost risk / heat risk?????
-
-
-#identify temperature patterns before and after the flowering 
-
-#what am I looking for
-
-adamedor <- read.csv('data/combined_phenological_data_adamedor_clean.csv') %>% 
-  filter(!(species == 'Apple' & location == 'Klein-Altendorf' & cultivar == 'Elstar' & year %in% c(2008, 2010)),
-         !(species == 'Apricot' & location == 'Cieza' & cultivar == 'Sublime' & year == 2014))
 
 stations <-  read.csv('data/weather_ready/weather_station_phenological_observations.csv')
 
 
-
-#make predictions for the actual weather data
-cka <- read.csv('data/weather_ready/cka_clean.csv') %>% 
-  filter(Year < 2022)
-cieza <- read.csv('data/weather_ready/cieza_clean_patched.csv')
-sfax <- read.csv('data/weather_ready/sfax_clean.csv')
-meknes <- read.csv('data/weather_ready/meknes_clean.csv')
-zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv') %>% 
-  filter(Year < 2022)
-
-#idea eike: calculate frost risk for each day of the year, identify frost risk threshold at times of flowering
-#for daily data? --> chance of tmin lower than a certain temperature?
-#or do I calculate the average hours with temperatures below 0 each day?
-
-#based on daily data: chance for each doy to have temperatures below 0
-
-weather_list_obs <- list('Klein-Altendorf' = cka,
-                     'Cieza' = cieza,
-                     'Zaragoza' = zaragoza,
-                     'Sfax' = sfax,
-                     'Meknes' = meknes)
-weather_list_pred <- weather_list_obs
 
 frost_threshold <- 0
 heat_threshold <- 32
@@ -220,36 +512,35 @@ observation_df <- adamedor %>%
   filter(!(species %in% c( 'Peach', 'Olive')))
 
 
-source('code/utilities/get_thermal_timewindow.R')
-
-thermal_window <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
-                                                                                                             weather_list_pred = weather_list_obs, 
-                                                                                                             observation_df = observation_df, 
-                                                                                                             frost_threshold = 0, 
-                                                                                                             heat_threshold = 32, 
-                                                                                                             target_col_obs = x)) %>% 
-  bind_rows()
+thermal_window <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) LarsChill::get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
+                                                                                                                           weather_list_pred = weather_list_obs, 
+                                                                                                                           observation_df = observation_df, 
+                                                                                                                           frost_threshold = frost_threshold, 
+                                                                                                                           heat_threshold = heat_threshold, 
+                                                                                                                           target_col_obs = x,
+                                                                                                                           padding = 0.03)) %>% 
+  bind_rows() 
 
 
 
 #illustrate thermal time window
 thermal_window %>% 
-  mutate(loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Meknes', 'Sfax')))) %>% 
+  mutate(loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')))) %>% 
   ggplot(aes(x = loc, fill = location)) +
   geom_rect(aes(ymin = min_doy, ymax = max_doy, xmin = loc- 0.2, xmax = loc + 0.2)) +
-  scale_x_continuous(breaks = 1:5, labels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Meknes', 'Sfax')) +
+  scale_x_continuous(breaks = 1:6, labels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')) +
   facet_grid(flowering_type~species)
 
 #illustrate "sudoku" time window
-timewindow_df %>% 
-  mutate(loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Meknes', 'Sfax')))) %>% 
+transfer_ranges_df %>% 
+  mutate(loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')))) %>% 
   ggplot(aes(x = loc, fill = source)) +
   geom_rect(aes(ymax = upper_plus, ymin = lower_plus, xmin = loc- 0.2, xmax = loc + 0.2), col = 'grey10', fill = 'grey70') +
   geom_rect(aes(ymax = upper, ymin = lower, xmin = loc- 0.2, xmax = loc + 0.2), col = 'grey10') +
   geom_point(data = f_lower, aes(x = as.numeric(as.factor(location)), y = value), col = 'grey30') +
   geom_point(data = f_upper, aes(x = as.numeric(as.factor(location)), y = value), col = 'grey30') +
   scale_fill_manual(breaks = c('observed', 'deg_1', 'deg_2', 'deg_3'), values = c('grey50', 'palegreen4', 'steelblue', 'salmon')) +
-  scale_x_continuous(breaks = 1:5, labels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Meknes', 'Sfax')) +
+  scale_x_continuous(breaks = 1:6, labels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')) +
   facet_grid(flowering_type~species)
 
 
@@ -257,17 +548,23 @@ timewindow_df %>%
 
 window_df <- thermal_window %>% 
   mutate(flowering_type = recode(flowering_type, f5 = 'begin_flowering_f5', f50 = 'flowering_f50'),
-         lower =  min_doy,
-         upper = max_doy,
+         lower =  min_doy_padded,
+         upper = max_doy_padded,
          method = 'frost / heat risk',
          species = tolower(species)) %>% 
   dplyr::select(location, species, flowering_type, method, lower, upper)
 
-window_df <- timewindow_df %>% 
+window_df <- transfer_ranges_df %>% 
   mutate(method = 'transfer empirical windows',
          species = tolower(species)) %>% 
   dplyr::select(location, species, flowering_type, method, lower, upper) %>% 
   rbind(window_df)
+
+
+
+write.csv(window_df, 'data/bloom_timewindow_current_conditions.csv', row.names = FALSE)
+
+
 
 window_df %>% 
   mutate(loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Meknes', 'Sfax')))) %>% 
@@ -280,30 +577,135 @@ ggsave('figures/example_timewindow.jpeg', height = 15, width = 20, units = 'cm',
 
 
 
-#use the simulated weather for the calculation of failure rates
-thermal_window <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
-                                                                                                                weather_list_pred = weather_list_obs, 
-                                                                                                                observation_df = observation_df, 
-                                                                                                                frost_threshold = 0, 
-                                                                                                                heat_threshold = 32, 
-                                                                                                                target_col_obs = x)) %>% 
-  bind_rows() %>% 
-  mutate(species = tolower(species))
 
 
-chillR::genSeasonList()
+#-----------------------------#
+#visualize type 1 and type2 errors of both methods
+#------------------------------#
+
+err1_df <- window_df %>% 
+  merge(master_pheno, by = c('species', 'flowering_type', 'location')) %>% 
+  mutate(failure = pred < lower | pred > upper) %>% 
+  group_by(species, cultivar, location, method) %>% 
+  summarise(failure_rate = sum(failure) / n())
+
+err1_plot_methods <- err1_df %>% 
+  mutate(failure_rate = failure_rate * 100,
+         species_label = recode(species, `european plum` = "europ. plum", `japanese plum` = "jap. plum"),
+         species_label = str_to_title(species_label)) %>% 
+  ggplot(aes(x = species_label, y = failure_rate, fill = method)) +
+  geom_boxplot() +
+  coord_cartesian(ylim = c(0,112))+
+  facet_grid(~location, scales = 'free_x', space = 'free_x') +
+  ylab('Type 1 Error (%)') +
+  xlab('') +
+  scale_color_manual(values = okabe) +
+  theme_bw(base_size = 15) +
+  theme(legend.position = 'none')
+
+
+
+err2_df <- window_df %>% 
+  merge(pheno_current, by = c('species', 'flowering_type', 'location')) %>% 
+  mutate(failure = pred < lower | pred > upper) %>% 
+  group_by(species, cultivar, location, method) %>% 
+  summarise(failure_rate = sum(failure) / n()) %>% 
+  filter((species %in% c('apricot', 'apple', 'european plum', 'japanese plum', 'pear', 'sweet cherry') & location == 'Sfax') |
+           (species %in% c('almond', 'pistachio') & location %in% c('Klein-Altendorf', 'Zaragoza'))) 
+
+err2_plot <- err2_df %>% 
+  mutate(failure_rate = failure_rate * 100,
+         species_label = recode(species, `european plum` = "europ. plum", `japanese plum` = "jap. plum"),
+         species_label = str_to_title(species_label)) %>% 
+  ggplot(aes(x = species_label, y = failure_rate, fill = method)) +
+  geom_boxplot() +
+  coord_cartesian(ylim = c(0,112))+
+  facet_grid(~location, scales = 'free_x', space = 'free_x') +
+  ylab('Type 1 Error (%)') +
+  xlab('') +
+  scale_color_manual(values = okabe) +
+  theme_bw(base_size = 15) +
+  theme(legend.position = 'none')
+
+#the plots still need fine tuning
+#colors need to be different
+#labelling
+#also look up how to change the paddings of the plot to make the patchowrk more tight
+
+
+
+
+type2 <- fail_su_current %>% 
+  rbind(fail_ther_current) %>% 
+  mutate(species = stringr::str_to_title(species),
+         location_label = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
+                                 Zaragoza = 'Zarag.')) %>% 
+  filter((species %in% c('Apricot', 'Apple', 'European Plum', 'Japanese Plum', 'Pear', 'Sweet Cherry') & location == 'Sfax') |
+           (species == 'Almond' & location %in% c('Klein-Altendorf', 'Zaragoza'))) %>% 
+  mutate(type_two_error = 1 - failure_rate,
+         location_label = factor(location_label, levels = c('Kl.-Alt.', 'Zarag.', 'Sfax'))) %>% 
+  ggplot(aes(y = type_two_error, x = species, fill = window_type)) +
+  geom_boxplot() +
+  facet_grid(~location_label, scales = 'free_x', space = 'free_x') +
+  theme_bw(base_size = 15) +
+  xlab('') +
+  ylab('Type II error') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  scale_fill_manual(values = c("steelblue", "#E69F00"), breaks = c('thermal', 'sudoku'), labels = c('Thermal Risk', 'Transfer Ranges'))+
+  #theme(legend.title = 'Method to construct\ntime window') +
+  guides(fill=guide_legend(title="Flowering Window Method"))
+
+type1 <- fail_su_current %>% 
+  rbind(fail_ther_current) %>% 
+  mutate(species = stringr::str_to_title(species),
+         location_label = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
+                                 Zaragoza = 'Zarag.'),
+         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Meknes', 'Sfax'))) %>% 
+  filter((location == 'Klein-Altendorf' & species %in% c('Apple', 'European Plum', 'Japanese Plum', 'Pear', 'Sweet Cherry')) |
+           (location == 'Cieza' & species %in% c('Apricot')) |
+           (location == 'Zaragoza' & species %in% c('Apricot', 'Sweet Cherry', 'Pear')) |
+           (location == 'Meknes' & species %in% c('Almond', 'Apple')) |
+           (location == 'Sfax' & species %in% c('Almond', 'Pistachio'))) %>% 
+  ggplot(aes(y = failure_rate, x = species, fill = window_type)) +
+  geom_boxplot() +
+  facet_grid(~location, scales = 'free_x', space = 'free_x') +
+  theme_bw(base_size = 15) +
+  xlab('') +
+  ylab('Type I error') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  scale_fill_manual(values = c("steelblue", "#E69F00"), breaks = c('thermal', 'sudoku'), labels = c('Thermal Risk', 'Transfer Ranges')) +
+  #theme(legend.title = 'Method to construct\ntime window') +
+  guides(fill=guide_legend(title="Flowering Window Method"))
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #------------------------------------#
 # Phenology for observed weather #####
 #------------------------------------#
 
 pheno_current <-  read.csv('data/projected_bloomdates_ensemble_observed_weather.csv') %>% 
-  mutate(species = tolower(species)) 
+  mutate(species = tolower(species),
+         flowering_type = ifelse(species %in% c('apple', 'european plum', 'japanese plum'), yes = 'begin_flowering_f5', no = 'flowering_f50')) 
+
+
+timewindow_df <- read.csv('data/bloom_timewindow_current_conditions.csv')
 
 
 pheno_current %>% 
-  merge.data.frame(thermal_window, by = c('species', 'location', 'flowering_type')) %>% 
-  mutate(failure = pheno_predicted < min_doy | pheno_predicted > max_doy) %>% 
+  merge.data.frame(timewindow_df, by = c('species', 'location', 'flowering_type')) %>% 
+  filter(method == 'frost / heat risk') %>% 
+  mutate(failure = pred < lower | pred > upper) %>% 
   group_by(location, species, cultivar) %>% 
   summarise(failure_rate = sum(failure) / n()) %>% 
   ggplot(aes(x = species, y = failure_rate, fill = location)) +
@@ -314,9 +716,10 @@ head(pheno_current)
 
 #--> plot thermal window with predicted flowering dates
 pheno_current %>% 
-  merge.data.frame(thermal_window, by = c('species', 'location', 'flowering_type')) %>% 
-  ggplot(aes(x = pheno_predicted, y = cultivar)) +
-  geom_rect(aes(xmin = min_doy, xmax = max_doy, ymin = -Inf, ymax = Inf,
+  merge.data.frame(timewindow_df, by = c('species', 'location', 'flowering_type')) %>% 
+  filter(method == 'frost / heat risk') %>% 
+  ggplot(aes(x = pred, y = cultivar)) +
+  geom_rect(aes(xmin = lower, xmax = upper, ymin = -Inf, ymax = Inf,
                 fill = 'Thermal risks')) +
   geom_point(alpha = 0.2) +
   scale_fill_manual(values = 'lightsalmon') +
@@ -327,17 +730,13 @@ pheno_current %>%
 ggsave(filename = 'figures/timewindow_thermal_current.jpeg',
        height = 40, width = 30, units = 'cm', device = 'jpeg')
 
-sudoku_timewindow <- timewindow_df %>% 
-  mutate(species = tolower(species),
-         min_doy = lower,
-         max_doy = upper) %>% 
-  dplyr::select(species, location, flowering_type, min_doy, max_doy)
 
 #now the sudoku time window
 pheno_current %>% 
-  merge.data.frame(sudoku_timewindow, by = c('species', 'location', 'flowering_type')) %>% 
-  ggplot(aes(x = pheno_predicted, y = cultivar)) +
-  geom_rect(aes(xmin = min_doy, xmax = max_doy, ymin = -Inf, ymax = Inf,
+  merge.data.frame(timewindow_df, by = c('species', 'location', 'flowering_type')) %>% 
+  filter(method == 'transfer empirical windows') %>% 
+  ggplot(aes(x = pred, y = cultivar)) +
+  geom_rect(aes(xmin = lower, xmax = upper, ymin = -Inf, ymax = Inf,
                 fill = '"Sudoku"')) +
   geom_point(alpha = 0.2) +
   scale_fill_manual(values = 'lightsteelblue') +
@@ -351,37 +750,20 @@ ggsave(filename = 'figures/timewindow_sudoku_current.jpeg',
        height = 40, width = 30, units = 'cm', device = 'jpeg')
 
 
-
-#calculate failure rates for two approaches
-
-fail_su_current <- pheno_current %>% 
-  merge.data.frame(sudoku_timewindow, by = c('species', 'location', 'flowering_type')) %>% 
-  group_by(location, species, cultivar) %>% 
-  summarise(failure_rate = sum(pheno_predicted < min_doy | pheno_predicted > max_doy) / n(),
-            dist_window = min(c(abs(pheno_predicted - min_doy), abs(pheno_predicted - max_doy))),
-            too_early = sum(pheno_predicted < min_doy) / n(),
-            too_late = sum(pheno_predicted > max_doy) / n(),
-            window_type = 'sudoku')
-
-fail_ther_current <- pheno_current %>% 
-  merge.data.frame(thermal_window, by = c('species', 'location', 'flowering_type')) %>% 
-  group_by(location, species, cultivar) %>% 
-  summarise(failure_rate = sum(pheno_predicted < min_doy | pheno_predicted > max_doy) / n(),
-            dist_window = min(c(abs(pheno_predicted - min_doy), abs(pheno_predicted - max_doy))),
-            too_early = sum(pheno_predicted < min_doy) / n(),
-            too_late = sum(pheno_predicted > max_doy) / n(),
-            window_type = 'thermal')
-
-fail_su_current %>% 
-  rbind(fail_ther_current) %>% 
-  ggplot(aes(x = failure_rate, y = cultivar, fill = window_type)) +
+pheno_current %>% 
+  merge.data.frame(timewindow_df, by = c('species', 'location', 'flowering_type')) %>% 
+  mutate(failure = pred < lower | pred > upper) %>% 
+  group_by(location, species, cultivar, method) %>% 
+  summarise(failure_rate = sum(failure) / n()) %>% 
+  ggplot(aes(x = failure_rate, y = cultivar, fill = method)) +
   geom_bar(stat = 'identity', position = 'dodge') +
   facet_grid(species~location, scales = 'free_y', space = 'free_y') +
   
   theme_bw(base_size = 15) +
-  scale_fill_manual(values = c('salmon', 'steelblue'), breaks = c('thermal', 'sudoku'), labels = c('Thermal risks', '"Sudoku"'))+
+  scale_fill_manual(values = c('salmon', 'steelblue'), breaks = c('frost / heat risk', 'transfer empirical windows'), labels = c('Thermal risks', '"Sudoku"'))+
   #theme(legend.title = 'Method to construct\ntime window') +
   guides(fill=guide_legend(title="Method to construct\ntime window"))
+
 ggsave(filename = 'figures/timewindow_failurerate_current.jpeg',
        height = 40, width = 30, units = 'cm', device = 'jpeg')
 
@@ -413,6 +795,8 @@ thermal_window_hist <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), func
                                                                                                                 target_col_obs = x)) %>% 
   bind_rows() %>% 
   mutate(species = tolower(species))
+
+timewindow_df
 
 
 
