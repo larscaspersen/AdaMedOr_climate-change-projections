@@ -1,7 +1,7 @@
 #yet another almond fitting
 #I forgot santomera data
 
-#setwd('../almond_pheno')
+#setwd('../fruittree_portfolio/')
 
 library(chillR)
 library(tidyverse)
@@ -155,8 +155,8 @@ for(cult in cultivars){
 #--> modify the fitting function for that
 x_0 <- c(24.79,	337.04,	0.2529,	17.72,	285.54,	   45.67,	  29.49,	2.97,	1.87,	2.69)
 #        yc      zc     s1      Tu      theta_c   tau      piec    Tf     Tb     slope
-x_U <- c(40,    500,    1.0,    30,     287,       48,      50,    10,    10,     5.00)
-x_L <- c(5,    100,    0.1,    15,     284,       16,      24,     2,     2,     1.2)
+x_U <- c(80,    500,    1.0,    30,     287,       48,      50,    10,    10,     5.00)
+x_L <- c(20,    100,    0.1,    15,     284,       16,      24,     2,     2,     1.2)
 
 source('code/utilities/evaluation_function_meigo_nonlinear_fixed.R')
 
@@ -172,13 +172,13 @@ problem<-list(f="custom_evaluation_function_meigo_nonlinear_fixed",
               x_U = x_U,
               c_L = c_L, 
               c_U = c_U,
-              vtr = 50)
+              vtr = 200)
 
 
 #options for fitter
 opts<-list(#maxeval = 1000,
   maxtime = 60 * 30, 
-  maxeval = 30000,
+  maxeval = 50000,
   local_solver = 'DHC', 
   local_bestx = 1,
   inter_save = 0,
@@ -234,12 +234,13 @@ for(i in 1:10){
     res_list[[i]][[cult]] <- res_list_refitted[[cult]][[i]]
   }
 }
+dir.create('data/fitting/almond/repeated_fitting_santomera_v2')
 
 source('code/utilities/load_fitting_result.R')
 source('code/utilities/save_fitting_list.R')
 #save data
 for(i in 1:10){
-  save_fitting_list(fit_list = res_list[[i]], path = 'data/fitting/almond/repeated_fitting_with_santomera/', prefix = paste0('batch1_repeat', i, '_'))
+  save_fitting_list(fit_list = res_list[[i]], path = 'data/fitting/almond/repeated_fitting_santomera_v2/', prefix = paste0('batch1_repeat', i, '_'))
 }
 
 
@@ -285,7 +286,7 @@ source('code/utilities/load_fitting_result.R')
 source('code/utilities/save_fitting_list.R')
 #save data
 for(i in 1:10){
-  save_fitting_list(fit_list = res_list[[i]], path = 'data/fitting/almond/repeated_fitting_with_santomera/', prefix = paste0('batch2_repeat', i, '_'))
+  save_fitting_list(fit_list = res_list[[i]], path = 'data/fitting/almond/repeated_fitting_santomera_v2/', prefix = paste0('batch2_repeat', i, '_'))
 }
 
 
@@ -331,7 +332,7 @@ source('code/utilities/load_fitting_result.R')
 source('code/utilities/save_fitting_list.R')
 #save data
 for(i in 1:10){
-  save_fitting_list(fit_list = res_list[[i]], path = 'data/fitting/almond/repeated_fitting_with_santomera/', prefix = paste0('batch3_repeat', i, '_'))
+  save_fitting_list(fit_list = res_list[[i]], path = 'data/fitting/almond/repeated_fitting_santomera_v2/', prefix = paste0('batch3_repeat', i, '_'))
 }
 
 
@@ -376,7 +377,7 @@ source('code/utilities/load_fitting_result.R')
 source('code/utilities/save_fitting_list.R')
 #save data
 for(i in 1:10){
-  save_fitting_list(fit_list = res_list[[i]], path = 'data/fitting/almond/repeated_fitting_with_santomera/', prefix = paste0('batch4_repeat', i, '_'))
+  save_fitting_list(fit_list = res_list[[i]], path = 'data/fitting/almond/repeated_fitting_santomera_v2/', prefix = paste0('batch4_repeat', i, '_'))
 }
 
 
@@ -390,24 +391,25 @@ almond_fit1 <- almond_fit2 <- almond_fit3 <- almond_fit4 <- almond_fit <- list()
 
 for(i in 1:10){
   
-  almond_fit1[[i]] <- load_fitting_result('data/fitting/almond/repeated_fitting_with_santomera/',
+  almond_fit1[[i]] <- LarsChill::load_fitting_result('data/fitting/almond/repeated_fitting_santomera_v2/',
                                           prefix = paste0('batch1_repeat', i, '_'))
   
-  almond_fit2[[i]] <- load_fitting_result('data/fitting/almond/repeated_fitting_with_santomera/',
+  almond_fit2[[i]] <- LarsChill::load_fitting_result('data/fitting/almond/repeated_fitting_santomera_v2/',
                                           prefix = paste0('batch2_repeat', i, '_'))
   
   
-  almond_fit3[[i]] <- load_fitting_result('data/fitting/almond/repeated_fitting_with_santomera/',
+  almond_fit3[[i]] <- LarsChill::load_fitting_result('data/fitting/almond/repeated_fitting_santomera_v2/',
                                           prefix = paste0('batch3_repeat', i, '_'))
   
-  almond_fit4[[i]] <- load_fitting_result('data/fitting/almond/repeated_fitting_with_santomera/',
+  almond_fit4[[i]] <- LarsChill::load_fitting_result('data/fitting/almond/repeated_fitting_santomera_v2/',
                                           prefix = paste0('batch4_repeat', i, '_'))
   
   almond_fit[[i]] <- c(almond_fit1[[i]], almond_fit2[[i]], almond_fit3[[i]], almond_fit4[[i]])
 }
 
 
+ dir.create('data/fitting/almond/repeated_fitting_santomera_v2_cleanly_saved')
 #save data
 for(i in 1:10){
-  save_fitting_list(almond_fit[[i]], path = 'data/fitting/almond/repeated_fitting_santomera_cleanly_saved/', prefix = paste0('repeat', i, '_'))
+  LarsChill::save_fitting_list(almond_fit[[i]], path = 'data/fitting/almond/repeated_fitting_santomera_v2_cleanly_saved/', prefix = paste0('repeat', i, '_'))
 }
