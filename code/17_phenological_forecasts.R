@@ -84,14 +84,104 @@ for(i in 1:length(fit_list_combined)){
 #maybe read at first all weather data
 future_weather_list <- chillR::load_temperature_scenarios('data/future_weather/', prefix = '')
 
+par_list <- input_list$Apricot_Búlida$models
+confidence <- input_list$Apricot_Búlida$confidence
+i <- 1
+split_name <- names(future_weather_list)[i] %>% 
+  str_split_1(pattern = c('_')) %>%
+  str_split(pattern = '\\.') %>% 
+  unlist()
 
+lat <- stations %>% 
+  filter(station_name == split_name[1]) %>% 
+  pull(latitude)
+
+SeasonList <- future_weather_list[[i]] %>% 
+  chillR::stack_hourly_temps(latitude = lat) %>% 
+  purrr::pluck('hourtemps') %>% 
+  genSeasonList(years = 2001:2100)
+temp <- SeasonList
+x<- par_list[[1]]
+
+x
+
+
+ensemble_prediction_with_failure <- function(par_list, confidence, temp, theta_star = 279, Tc = 36, return_se = TRUE, n_fail = 5){
+  
+  
+  predicted <- purrr::map(par_list, function(x){
+    par <- x$xbest
+    par <- c(par[1:4], theta_star, par[5:8], Tc, par[9:10])
+    
+    return_predicted_days(convert_parameters(par), 
+                          modelfn = custom_PhenoFlex_GDHwrapper, 
+                          SeasonList =temp,
+                          na_penalty = NA)
+  }) %>% 
+    stats::setNames(1:length(par_list)) %>% 
+    dplyr::bind_cols() %>% 
+    as.matrix()
+  
+  #if as many as n_fail model runs indicate failure, then mark as NA, otherwise discard them and calculate mean of the remaining ones
+  pred_na <- apply(predicted, MARGIN = 1, FUN = function(x) sum(is.na(x)) >= n_fail) 
+  
+
+  #create a weight data.frame with the same dimensions as predicted
+  weights <- apply(predicted, MARGIN = 1, function(x){
+    #presence of NA
+    if(sum(is.na(x)) == 0){
+      return(confidence / sum(confidence))
+    }
+    #position of NA
+    pos.na <- which(is.na(x))
+    
+    #create intermediate object which I can manipulate
+    conf <- confidence
+
+    #calculate replace the confidence at position of NA with zero
+    conf[pos.na] <- 0
+    
+    return(conf / sum(conf))
+  }) %>% 
+    t()
+  
+  #calculate sd, excluding NA values
+  sd_pred <- predicted %>% 
+    t() %>% 
+    as.data.frame() %>% 
+    magrittr::set_colnames( 1:nrow(predicted)) %>% 
+    reshape2::melt(id.vars = NULL) %>% 
+    dplyr::group_by(.data$variable) %>% 
+    dplyr::summarise(sd = stats::sd(.data$value, na.rm = TRUE)) %>% 
+    dplyr::pull(.data$sd)
+  
+  #replace predicted NA with 0s
+  predicted_tmp <- predicted %>% replace(is.na(.), 0)
+  
+  #calculate weighted individual pred, then get the sum
+  weighted_pred <- predicted_tmp * weights 
+  pred_out <- rowSums(weighted_pred)
+  
+  #in case too many models indicated NA, then the whole prediction becomes NA
+  pred_out[pred_na] <- NA
+  
+
+  
+  if(return_se){
+    return(list(predicted = pred_out, sd = sd_pred,
+                individual_pred = predicted))
+  } else{
+    return(weighted_pred)
+  }
+  
+}
 
 #the function 
 
 #wrapper function which makes the predictions for all cultivars / species for one seasonlist of generated weather
 wrapper_ensemble_predictions <- function(SeasonList, input_list, plot_progress = FALSE){
   
-  test <- purrr::map(input_list, function(input) pheno_ensemble_prediction(par_list = input$models, confidence = input$confidence, temp = SeasonList), .progress = plot_progress )
+  test <- purrr::map(input_list, function(input) ensemble_prediction_with_failure(par_list = input$models, confidence = input$confidence, temp = SeasonList), .progress = plot_progress )
   
   
   sd_prediction <- test %>% 
@@ -395,7 +485,7 @@ hist_all_predictions <- purrr::map(1:length(hist_gen_weather), function(i){
   mutate(flowering_type = ifelse(species %in% c('Sweet Cherry', 'Pistachio', 'Pear', 'Apricot', 'Almond'), yes = 'flowering_f50', no = 'begin_flowering_f5'))
 
 
-write.csv(hist_all_predictions, 'data/projected_bloomdates_ensemble_historic_scenarios.csv', row.names = FALSE)
+#write.csv(hist_all_predictions, 'data/projected_bloomdates_ensemble_historic_scenarios.csv', row.names = FALSE)
 #hist_all_predictions <- read.csv('data/projected_bloomdates_ensemble_historic_scenarios.csv')
 
 #need to indicate if the modelled phenology is f5 or f50
@@ -554,7 +644,7 @@ for(cult in cultivars){
   }
 }
 
-write.csv(x = master_pheno, file = 'data/master_phenology_repeated_splits_old_almond.csv', row.names = FALSE)
+#write.csv(x = master_pheno, file = 'data/master_phenology_repeated_splits_old_almond.csv', row.names = FALSE)
 
 master_pheno_almond <- read.csv( 'data/master_phenology_repeated_splits_old_almond.csv')
 
@@ -635,205 +725,205 @@ sub_SeasonList <- list()
 sub <- NULL
 prediction_df <- data.frame()
 
-#generate predictions
-spec <- 'Almond'
-for(i in 1:10){
-
-  for(cult in cultivars){
-
-
-
-    #extract parameters
-    par <- almond_fit[[i]][[cult]]$xbest
-    #add fixed parameters
-    par <- c(par[1:4], theta_star, par[5:8], Tc, par[9:10])
-
-    #subset master file
-    sub <- master_pheno_almond %>%
-      filter(species == spec,
-             cultivar == cult,
-             repetition == i)
-
-    #generate seasonlist
-    sub_SeasonList <-  purrr::map2(sub$location, sub$year, function(loc, yr) SeasonList[[loc]][[as.character(yr)]])
-
-    #predict bloom days
-    sub$pred <- return_predicted_days(par = convert_parameters(par),
-                                      modelfn = custom_PhenoFlex_GDHwrapper,
-                                      SeasonList =sub_SeasonList)
-
-    prediction_df <- rbind.data.frame(prediction_df,
-                                      sub)
-
-
-
-  }
-}
-
-iqr_df <- master_pheno_almond %>%
-  dplyr::filter(repetition == 1) %>%
-  group_by(cultivar) %>%
-  summarise(iqr = IQR(pheno))
-
-performance <- prediction_df %>%
-  merge(iqr_df, by = 'cultivar') %>%
-  group_by(species, cultivar, repetition, iqr, split) %>%
-  summarise(rmse = RMSEP(pred, pheno),
-            mean_bias = mean(pred - pheno)) %>%
-  ungroup() %>%
-  mutate(rpiq_adj = iqr / rmse)
-
-write.csv(performance, 'data/performance_fitted_models_almond.csv', row.names = FALSE)
-performance <- read.csv('data/performance_fitted_models_almond.csv')
-
-
-#do the predictions for current, future and hist weather based on the calculated performance
-#may need to merhe the results later on with the other data when making the plots
-
-
-
-#future weather
-
-#maybe read at first all weather data
-future_weather_list <- chillR::load_temperature_scenarios('data/future_weather/', prefix = '')
-
-
-#preparation of input for the wrapper function for the ensemble predictions
-input_list <- list()
-
-spec <- 'Almond'
-
-for(cult in cultivars){
-  input_list[[paste0(spec, '_', cult)]] <- list(
-    'models' = purrr::map(almond_fit, cult),
-    'confidence' =     performance %>% 
-      filter(species == spec, cultivar == cult, split == 'Validation') %>% 
-      arrange(repetition) %>% 
-      pull(rpiq_adj)
-  )
-  
-}
-
-#the function 
-
-#wrapper function which makes the predictions for all cultivars / species for one seasonlist of generated weather
-wrapper_ensemble_predictions <- function(SeasonList, input_list, plot_progress = FALSE){
-  
-  test <- purrr::map(input_list, function(input) pheno_ensemble_prediction(par_list = input$models, confidence = input$confidence, temp = SeasonList), .progress = plot_progress )
-  
-  
-  sd_prediction <- test %>% 
-    purrr::map('sd') %>% 
-    do.call('cbind',.) %>% 
-    reshape2::melt(id.vars = NULL, value.name = 'sd') %>% 
-    rename(year = Var1, species_cultivar = Var2)
-  
-  prediction <- test %>% 
-    purrr::map('predicted') %>% 
-    do.call('cbind',.) %>% 
-    reshape2::melt(id.vars = NULL, value.name = 'pheno_predicted') %>% 
-    rename(year = Var1, species_cultivar = Var2) %>% 
-    merge.data.frame(sd_prediction, by = c('year', 'species_cultivar')) %>% 
-    arrange(year)
-  
-  
-  
-  return(prediction)
-}
-
-
-#
-all_predictions <- purrr::map(1:length(future_weather_list), function(i){
-  split_name <- names(future_weather_list)[i] %>% 
-    str_split_1(pattern = c('_')) %>%
-    str_split(pattern = '\\.') %>% 
-    unlist()
-  
-  lat <- weather_stations %>% 
-    filter(station_name == split_name[1]) %>% 
-    pull(latitude)
-  
-  out <- future_weather_list[[i]] %>% 
-    chillR::stack_hourly_temps(latitude = lat) %>% 
-    purrr::pluck('hourtemps') %>% 
-    genSeasonList(years = 2001:2100) %>% 
-    wrapper_ensemble_predictions(input_list) %>% 
-    mutate(location = split_name[1],
-           gcm = split_name[3],
-           ssp = split_name[2],
-           scenario_year = split_name[4])
-  
-  return(out)
-}, .progress = TRUE)
-
-almond_old_pred <- all_predictions %>% 
-  bind_rows() %>% 
-  tidyr::separate(species_cultivar, into = c('species', 'cultivar'), sep = '_')
-  
-
-write.csv(almond_old_pred, 'data/projected_bloomdates_cc_almond_old.csv', row.names = FALSE)
-
-
-#make the same for observed weather and 2015 weather
-
-#predictions for observed weather
-
-all_predictions_obs <- purrr::map(1:length(SeasonList), function(i){
-
-  out <- SeasonList[[i]] %>% 
-    wrapper_ensemble_predictions(input_list) %>% 
-    mutate(location = names(SeasonList)[i],
-           gcm = 'observed_weather',
-           ssp = 'observed_weather',
-           scenario_year = 'observed_weather',
-           year = factor(year, levels = 1:length(SeasonList[[i]]), labels = names(SeasonList[[i]])))
-  
-  return(out)
-}, .progress = TRUE)
-
-all_predictions_obs <- all_predictions_obs %>% 
-  bind_rows()
-
-
-write.csv(all_predictions_obs, 'data/projected_bloomdates_observed_weather_almond_old.csv')
-
-
-#read historic weather generator data+
-hist_gen_weather <- chillR::load_temperature_scenarios('data/hist-sim-weather/', prefix = 'hist_gen_2015')
-
-
-hist_all_predictions <- purrr::map(1:length(hist_gen_weather), function(i){
-  location <- names(hist_gen_weather)[i] 
-  
-  lat <- weather_stations %>% 
-    filter(station_name == location) %>% 
-    pull(latitude)
-  
-  colnames(hist_gen_weather[[i]]) <- c('DATE', 'Year', 'Month', 'Day', 'nodata', 'Tmin', 'Tmax')
-  
-  out <- hist_gen_weather[[i]] %>% 
-    chillR::stack_hourly_temps(latitude = lat) %>% 
-    purrr::pluck('hourtemps') %>% 
-    genSeasonList(years = 2001:2100) %>% 
-    wrapper_ensemble_predictions(input_list) %>% 
-    mutate(location = location,
-           gcm = 'historical',
-           ssp = 'historical',
-           scenario_year = 2015)
-  
-  return(out)
-}, .progress = TRUE) %>% 
-  bind_rows() %>% 
-  separate(col = species_cultivar, into = c('species', 'cultivar'), sep = '_') %>% 
-  mutate(flowering_type = ifelse(species %in% c('Sweet Cherry', 'Pistachio', 'Pear', 'Apricot'), yes = 'flowering_f50', no = 'begin_flowering_f5'))
-
-
-write.csv(hist_all_predictions, 'data/projected_bloomdates_ensemble_historic_scenarios_almond_old.csv', row.names = FALSE)
-
-
-
-
-
+# #generate predictions
+# spec <- 'Almond'
+# for(i in 1:10){
+# 
+#   for(cult in cultivars){
+# 
+# 
+# 
+#     #extract parameters
+#     par <- almond_fit[[i]][[cult]]$xbest
+#     #add fixed parameters
+#     par <- c(par[1:4], theta_star, par[5:8], Tc, par[9:10])
+# 
+#     #subset master file
+#     sub <- master_pheno_almond %>%
+#       filter(species == spec,
+#              cultivar == cult,
+#              repetition == i)
+# 
+#     #generate seasonlist
+#     sub_SeasonList <-  purrr::map2(sub$location, sub$year, function(loc, yr) SeasonList[[loc]][[as.character(yr)]])
+# 
+#     #predict bloom days
+#     sub$pred <- return_predicted_days(par = convert_parameters(par),
+#                                       modelfn = custom_PhenoFlex_GDHwrapper,
+#                                       SeasonList =sub_SeasonList)
+# 
+#     prediction_df <- rbind.data.frame(prediction_df,
+#                                       sub)
+# 
+# 
+# 
+#   }
+# }
+# 
+# iqr_df <- master_pheno_almond %>%
+#   dplyr::filter(repetition == 1) %>%
+#   group_by(cultivar) %>%
+#   summarise(iqr = IQR(pheno))
+# 
+# performance <- prediction_df %>%
+#   merge(iqr_df, by = 'cultivar') %>%
+#   group_by(species, cultivar, repetition, iqr, split) %>%
+#   summarise(rmse = RMSEP(pred, pheno),
+#             mean_bias = mean(pred - pheno)) %>%
+#   ungroup() %>%
+#   mutate(rpiq_adj = iqr / rmse)
+# 
+# write.csv(performance, 'data/performance_fitted_models_almond.csv', row.names = FALSE)
+# performance <- read.csv('data/performance_fitted_models_almond.csv')
+# 
+# 
+# #do the predictions for current, future and hist weather based on the calculated performance
+# #may need to merhe the results later on with the other data when making the plots
+# 
+# 
+# 
+# #future weather
+# 
+# #maybe read at first all weather data
+# future_weather_list <- chillR::load_temperature_scenarios('data/future_weather/', prefix = '')
+# 
+# 
+# #preparation of input for the wrapper function for the ensemble predictions
+# input_list <- list()
+# 
+# spec <- 'Almond'
+# 
+# for(cult in cultivars){
+#   input_list[[paste0(spec, '_', cult)]] <- list(
+#     'models' = purrr::map(almond_fit, cult),
+#     'confidence' =     performance %>% 
+#       filter(species == spec, cultivar == cult, split == 'Validation') %>% 
+#       arrange(repetition) %>% 
+#       pull(rpiq_adj)
+#   )
+#   
+# }
+# 
+# #the function 
+# 
+# #wrapper function which makes the predictions for all cultivars / species for one seasonlist of generated weather
+# wrapper_ensemble_predictions <- function(SeasonList, input_list, plot_progress = FALSE){
+#   
+#   test <- purrr::map(input_list, function(input) pheno_ensemble_prediction(par_list = input$models, confidence = input$confidence, temp = SeasonList), .progress = plot_progress )
+#   
+#   
+#   sd_prediction <- test %>% 
+#     purrr::map('sd') %>% 
+#     do.call('cbind',.) %>% 
+#     reshape2::melt(id.vars = NULL, value.name = 'sd') %>% 
+#     rename(year = Var1, species_cultivar = Var2)
+#   
+#   prediction <- test %>% 
+#     purrr::map('predicted') %>% 
+#     do.call('cbind',.) %>% 
+#     reshape2::melt(id.vars = NULL, value.name = 'pheno_predicted') %>% 
+#     rename(year = Var1, species_cultivar = Var2) %>% 
+#     merge.data.frame(sd_prediction, by = c('year', 'species_cultivar')) %>% 
+#     arrange(year)
+#   
+#   
+#   
+#   return(prediction)
+# }
+# 
+# 
+# #
+# all_predictions <- purrr::map(1:length(future_weather_list), function(i){
+#   split_name <- names(future_weather_list)[i] %>% 
+#     str_split_1(pattern = c('_')) %>%
+#     str_split(pattern = '\\.') %>% 
+#     unlist()
+#   
+#   lat <- weather_stations %>% 
+#     filter(station_name == split_name[1]) %>% 
+#     pull(latitude)
+#   
+#   out <- future_weather_list[[i]] %>% 
+#     chillR::stack_hourly_temps(latitude = lat) %>% 
+#     purrr::pluck('hourtemps') %>% 
+#     genSeasonList(years = 2001:2100) %>% 
+#     wrapper_ensemble_predictions(input_list) %>% 
+#     mutate(location = split_name[1],
+#            gcm = split_name[3],
+#            ssp = split_name[2],
+#            scenario_year = split_name[4])
+#   
+#   return(out)
+# }, .progress = TRUE)
+# 
+# almond_old_pred <- all_predictions %>% 
+#   bind_rows() %>% 
+#   tidyr::separate(species_cultivar, into = c('species', 'cultivar'), sep = '_')
+#   
+# 
+# write.csv(almond_old_pred, 'data/projected_bloomdates_cc_almond_old.csv', row.names = FALSE)
+# 
+# 
+# #make the same for observed weather and 2015 weather
+# 
+# #predictions for observed weather
+# 
+# all_predictions_obs <- purrr::map(1:length(SeasonList), function(i){
+# 
+#   out <- SeasonList[[i]] %>% 
+#     wrapper_ensemble_predictions(input_list) %>% 
+#     mutate(location = names(SeasonList)[i],
+#            gcm = 'observed_weather',
+#            ssp = 'observed_weather',
+#            scenario_year = 'observed_weather',
+#            year = factor(year, levels = 1:length(SeasonList[[i]]), labels = names(SeasonList[[i]])))
+#   
+#   return(out)
+# }, .progress = TRUE)
+# 
+# all_predictions_obs <- all_predictions_obs %>% 
+#   bind_rows()
+# 
+# 
+# write.csv(all_predictions_obs, 'data/projected_bloomdates_observed_weather_almond_old.csv')
+# 
+# 
+# #read historic weather generator data+
+# hist_gen_weather <- chillR::load_temperature_scenarios('data/hist-sim-weather/', prefix = 'hist_gen_2015')
+# 
+# 
+# hist_all_predictions <- purrr::map(1:length(hist_gen_weather), function(i){
+#   location <- names(hist_gen_weather)[i] 
+#   
+#   lat <- weather_stations %>% 
+#     filter(station_name == location) %>% 
+#     pull(latitude)
+#   
+#   colnames(hist_gen_weather[[i]]) <- c('DATE', 'Year', 'Month', 'Day', 'nodata', 'Tmin', 'Tmax')
+#   
+#   out <- hist_gen_weather[[i]] %>% 
+#     chillR::stack_hourly_temps(latitude = lat) %>% 
+#     purrr::pluck('hourtemps') %>% 
+#     genSeasonList(years = 2001:2100) %>% 
+#     wrapper_ensemble_predictions(input_list) %>% 
+#     mutate(location = location,
+#            gcm = 'historical',
+#            ssp = 'historical',
+#            scenario_year = 2015)
+#   
+#   return(out)
+# }, .progress = TRUE) %>% 
+#   bind_rows() %>% 
+#   separate(col = species_cultivar, into = c('species', 'cultivar'), sep = '_') %>% 
+#   mutate(flowering_type = ifelse(species %in% c('Sweet Cherry', 'Pistachio', 'Pear', 'Apricot'), yes = 'flowering_f50', no = 'begin_flowering_f5'))
+# 
+# 
+# write.csv(hist_all_predictions, 'data/projected_bloomdates_ensemble_historic_scenarios_almond_old.csv', row.names = FALSE)
+# 
+# 
+# 
+# 
+# 
 
 
 
