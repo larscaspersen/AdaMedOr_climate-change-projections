@@ -22,7 +22,7 @@ adamedor %>%
 stations <- read.csv('data/weather_ready/weather_station_phenological_observations.csv')
 
 stations$species <- c(paste0(c('Apricot', 'Pear', 'Sweet Cherry'), collapse = ', '),
-                      paste0(c('Apple', 'European Plum', 'Japanese Plum', '\nPear', 'Sweet Cherry'), collapse = ', '),
+                      paste0(c('Apple', 'European Plum', '\nPear', 'Sweet Cherry'), collapse = ', '),
                       paste0(c('Almond', 'Pistachio'), collapse = ', '),
                       'Apricot',
                       paste0(c('Almond', 'Apple'), collapse = ', '),
@@ -30,7 +30,7 @@ stations$species <- c(paste0(c('Apricot', 'Pear', 'Sweet Cherry'), collapse = ',
 
 
 stations$label <- c(paste0('"', '~bold(Zaragoza)~\n', paste0(c('Apricot', 'Pear', 'Sweet*Cherry'), collapse = '*'), '"',  collapse = ''),
-                    paste0('"', '~bold(Klein-Altendorf)~\n', paste0(c('Apple', 'European*Plum', 'Japanese*Plum', '\nPear', 'Sweet*Cherry'), collapse = '*'),'"', collapse = ''),
+                    paste0('"', '~bold(Klein-Altendorf)~\n', paste0(c('Apple', 'European*Plum', '\nPear', 'Sweet*Cherry'), collapse = '*'),'"', collapse = ''),
                     paste0('"', '~bold(Sfax)~\n', paste0(c('Almond', 'Pistachio'), collapse = '*'), '"', collapse = ''),
                     paste0('"', '~bold(Cieza)~\n', paste0(c('Apricot')), '"', collapse = ''),
                     paste0('"', '~bold(Meknes)~\n', paste0(c('Almond', 'Apple'), collapse = '*'), '"', collapse = ''),
@@ -63,8 +63,8 @@ ggplot(data = world) +
   #                 fontface = "bold", position = position_dodge()) +
   geom_label_repel(data = stations, aes(x = longitude, y = latitude, label = species), 
                   nudge_x = c(-2, -3, -1.5, -1.5, -1.8, 1.5), 
-                  nudge_y = c(-0.70, -1.1, -0.70, -0.70, -0.70, -0.7), min.segment.length = 20, fill = "#FFFFFFAA", label.size = NA) +
-  coord_sf(xlim = c(-12, 12), ylim = c(28, 54), expand = FALSE) +
+                  udge_y = c(-0.70, -1.1, -0.70, -0.70, -0.70, -0.7), min.segment.length = 20, fill = "#FFFFFFAA", label.size = NA) +
+  oord_sf(xlim = c(-12, 12), ylim = c(28, 54), expand = FALSE) +
   xlab('Longitude') +
   ylab('Latitude')+
   annotation_scale(location = "bl", width_hint = 0.4) +
@@ -73,7 +73,7 @@ ggplot(data = world) +
     location = "bl", which_north = "true", 
                          pad_x = unit(0.5, "in"), pad_y = unit(0.25, "in"),
                          style = north_arrow_fancy_orienteering)
-ggsave('figures/overview_map.jpeg', height = 15, width = 10, units = 'cm', device = 'jpeg')
+ggsave('figures/paper/overview_map.jpeg', height = 15, width = 10, units = 'cm', device = 'jpeg')
 
 
 
