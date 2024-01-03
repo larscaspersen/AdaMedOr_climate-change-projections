@@ -6,7 +6,7 @@ library(LarsChill)
 library(patchwork)
 
 
-#setwd('../fruittree_portfolio/')
+#setwd('../2023_adamedor-dataset_fitting/')
 
 performance <- read.csv('data/performance_fitted_models.csv')
 
@@ -257,17 +257,17 @@ ggsave('figures/paper/performance_sum.jpeg', device = 'jpeg',
 #source('code/utilities/ensemble_prediction.R')
 #source('code/utilities/load_fitting_result.R')
 
-ensemble_prediction <- read.csv('data/projected_bloomdates_ensemble_observed_weather.csv')
+ensemble_prediction <- read.csv('data/projected_bloomdates_ensemble_observed_weather.csv') %>% 
+  mutate(species = recode(species, `Japanese Plum` = 'European Plum'))
 str(ensemble_prediction)
 str(prediction_df)
 
 enesmble_prediction_observed <- prediction_df %>%
-  mutate(species = recode(species, `Japanese Plum` = 'European Plum')) %>% 
   mutate(year = as.character(year)) %>% 
   merge.data.frame(ensemble_prediction, 
                    by.x = c('species', 'cultivar', 'location', 'year'),
                    by.y = c('species', 'cultivar', 'location', 'scenario_year'),
-                   all.x =  TRUE) %>% 
+                   all.x =  TRUE) %>%
   rename(pred_ensemble = pheno_predicted, pred_single = pred) %>% 
   filter(repetition == 1)
 
@@ -443,31 +443,31 @@ enesmble_prediction_observed %>%
 ggsave('figures/paper/ensemble_prediction_performance_european-plum.jpeg', height = 15, width = 25,
        units = 'cm', device = 'jpeg')
 
-
-enesmble_prediction_observed %>% 
-  filter(species == 'Japanese Plum') %>% 
-  ggplot(aes(x = pheno, y = pred_ensemble)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
-  geom_abline(slope = 1) +
-  facet_wrap(~cultivar)+
-  ylab('Predicted Bloom Date') +
-  xlab('Observed Bloom Date') +
-  # geom_text(data = performance_ensemble,  y = 150, x = 1, 
-  #           aes(label = paste('RMSE:', format(RMSE, nsmall = 1))), hjust = 0) +
-  # geom_text(data = performance_ensemble,  y = 140, x = 1, 
-  #           aes(label = paste('RPIQ:', format(RPIQ, nsmall = 1))), hjust = 0) +
-  # geom_text(data = performance_ensemble,  y = 130, x = 1, 
-  #           aes(label = paste('Mean Bias:', format(mean_bias, nsmall = 1))), hjust = 0) +
-  scale_x_continuous(limits = c(60, 152),
-                     breaks = c(60,91, 121, 152), 
-                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
-  scale_y_continuous(limits = c(60, 152),
-                     breaks = c(60,91, 121, 152), 
-                     labels = c('Mar', 'Apr', 'May', 'Jun')) +
-  theme_bw(base_size = 15) 
-ggsave('figures/paper/ensemble_prediction_performance_japanese-plum.jpeg', height = 15, width = 25,
-       units = 'cm', device = 'jpeg')
+# 
+# enesmble_prediction_observed %>% 
+#   filter(species == 'Japanese Plum') %>% 
+#   ggplot(aes(x = pheno, y = pred_ensemble)) +
+#   geom_point() +
+#   geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
+#   geom_abline(slope = 1) +
+#   facet_wrap(~cultivar)+
+#   ylab('Predicted Bloom Date') +
+#   xlab('Observed Bloom Date') +
+#   # geom_text(data = performance_ensemble,  y = 150, x = 1, 
+#   #           aes(label = paste('RMSE:', format(RMSE, nsmall = 1))), hjust = 0) +
+#   # geom_text(data = performance_ensemble,  y = 140, x = 1, 
+#   #           aes(label = paste('RPIQ:', format(RPIQ, nsmall = 1))), hjust = 0) +
+#   # geom_text(data = performance_ensemble,  y = 130, x = 1, 
+#   #           aes(label = paste('Mean Bias:', format(mean_bias, nsmall = 1))), hjust = 0) +
+#   scale_x_continuous(limits = c(60, 152),
+#                      breaks = c(60,91, 121, 152), 
+#                      labels = c('Mar', 'Apr', 'May', 'Jun')) +
+#   scale_y_continuous(limits = c(60, 152),
+#                      breaks = c(60,91, 121, 152), 
+#                      labels = c('Mar', 'Apr', 'May', 'Jun')) +
+#   theme_bw(base_size = 15) 
+# ggsave('figures/paper/ensemble_prediction_performance_japanese-plum.jpeg', height = 15, width = 25,
+#        units = 'cm', device = 'jpeg')
 
 
 
@@ -667,44 +667,54 @@ fail_sum <- pheno_and_window %>%
   summarise(out = (sum(out) / n())* 100) 
 
 
-pheno_and_window %>% 
-  merge(fail_sum, by = c('species', 'species_label', 'location', 'loc', 'spec')) %>% 
-  filter(pheno_predicted <= 213) %>% 
-  ggplot(aes(y = loc)) +
-  #geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = loc-0.4, ymax = loc+0.4),fill = 'grey60') +
-  geom_rect(aes(xmin = min(pheno_predicted)-10, xmax = min_doy_padded - 1, ymin = loc-0.5, ymax = loc+0.5),fill = 'grey60') +
-  geom_rect(aes(xmin = max_doy_padded + 1, xmax = 243, ymin = loc-0.5, ymax = loc+0.5),fill = 'grey60') +
-  geom_boxplot(aes(y = loc, x = pheno_predicted, group = loc, fill = fill_label), width = 0.6) +
-  geom_point(aes(x = 213 + 15, y = loc,  size = out)) +
-  scale_y_reverse(breaks = 1:6, labels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'), ) +
-  scale_x_continuous(breaks=        c(-31,  0, 32, 60,  91, 121, 152, 182, 213), 
-                     minor_breaks = c(-45, -15, 15, 46, 74, 105, 135, 166, 194), 
-                     labels = c('Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug')) +
-  #scale_fill_manual(values = c("#009E73", "#009E73", "#E69F00","#E69F00" ,"#E69F00", "#56B4E9", "#56B4E9" ) )+
-  xlab('Month') +
-  ylab('Location') +
-  facet_grid(species_label~.) +
-  theme_bw(base_size = 15) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom')  +
-  coord_cartesian(xlim = c(-45, 230))
+
+# pheno_and_window %>% 
+#   merge(fail_sum, by = c('species', 'species_label', 'location', 'loc', 'spec')) %>% 
+#   filter(pheno_predicted <= 213) %>% 
+#   ggplot(aes(y = loc)) +
+#   #geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = loc-0.4, ymax = loc+0.4),fill = 'grey60') +
+#   geom_rect(aes(xmin = min(pheno_predicted)-10, xmax = min_doy_padded - 1, ymin = loc-0.5, ymax = loc+0.5),fill = 'grey60') +
+#   geom_rect(aes(xmin = max_doy_padded + 1, xmax = 243, ymin = loc-0.5, ymax = loc+0.5),fill = 'grey60') +
+#   geom_boxplot(aes(y = loc, x = pheno_predicted, group = loc, fill = fill_label), width = 0.6) +
+#   geom_point(aes(x = 213 + 15, y = loc,  size = out)) +
+#   scale_y_reverse(breaks = 1:6, labels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'), ) +
+#   scale_x_continuous(breaks=        c(-31,  0, 32, 60,  91, 121, 152, 182, 213), 
+#                      minor_breaks = c(-45, -15, 15, 46, 74, 105, 135, 166, 194), 
+#                      labels = c('Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug')) +
+#   #scale_fill_manual(values = c("#009E73", "#009E73", "#E69F00","#E69F00" ,"#E69F00", "#56B4E9", "#56B4E9" ) )+
+#   xlab('Month') +
+#   ylab('Location') +
+#   facet_grid(species_label~.) +
+#   theme_bw(base_size = 15) +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom')  +
+#   coord_cartesian(xlim = c(-45, 230))
+
+
+alpha_fail <- 'low'
+alpha_okay <- 'high'
 
 pheno_and_window %>% 
   merge(fail_sum, by = c('species', 'species_label', 'location', 'loc', 'spec')) %>% 
-  mutate(location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))) %>% 
+  mutate(location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         alpha = ifelse(out >= 50, yes = alpha_fail, no = alpha_okay),
+         max_doy_padded = ifelse(max_doy_padded >= 182, yes = 181, no = max_doy_padded)) %>% 
   filter(pheno_predicted <= 182) %>% 
   ggplot(aes(y = spec)) +
   #geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = spec-0.4, ymax = spec+0.4),fill = 'grey60') +
   geom_rect(aes(xmin = min(pheno_predicted)-10, xmax = min_doy_padded - 1, ymin = spec-0.5, ymax = spec+0.5),fill = 'grey70') +
-  geom_rect(aes(xmin = max_doy_padded + 1, xmax = 243, ymin = spec-0.5, ymax = spec+0.5),fill = 'grey70') +
-  geom_boxplot(aes(y = spec, x = pheno_predicted, group = spec, fill = as.factor(spec)), width = 0.6, show.legend = FALSE) +
+  geom_rect(aes(xmin = max_doy_padded + 1, xmax = 242, ymin = spec-0.5, ymax = spec+0.5),fill = 'grey70') +
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 0.5),fill = 'grey70') +
+  geom_boxplot(aes(y = spec, x = pheno_predicted, group = spec, fill = as.factor(spec),
+                   alpha = alpha), width = 0.6, show.legend = FALSE) +
+  scale_alpha_discrete(range=c(1,0.2)) +
   geom_text(y = 0, x = 182 + 2, 
             aes(label = 'No Prediction'),hjust = 0) +
   geom_text(aes(x = 182 + 10, y = spec,  
                 label = paste(format(round(out, digits = 1), nsmall = 1), '%'))) +
   scale_y_reverse(breaks = 1:7, labels = c('Apple', 'Pear', 'Apricot', 'Europ. Plum', 'Sweet Cherry', 'Almond', 'Pistachio')) +
-  scale_x_continuous(breaks=        c(-31,  0, 32, 60,  91, 121, 152, 182), 
+  scale_x_continuous(breaks=        c(-31,  0, 32, 60,  91, 121, 152), 
                      minor_breaks = c(-45, -15, 15, 46, 74, 105, 135, 166), 
-                     labels = c('Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul')) +
+                     labels = c('Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun')) +
   scale_fill_manual(values = c("#009E73", "#009E73", "#E69F00","#E69F00" ,"#E69F00", "#56B4E9", "#56B4E9" ) )+
   scale_size_area(limits = c(0, 100), breaks = c(20, 40, 60, 80, 100),max_size = 8) +
   geom_vline(xintercept = 182, linetype = 'dashed')+
@@ -715,9 +725,360 @@ pheno_and_window %>%
   theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom')  +
   coord_cartesian(xlim = c(-45, 195),
                   ylim = c(7, 0))
-  
-  
 ggsave('figures/paper/time_window_and_current_prediction.jpeg', height = 35, width = 35, units = 'cm', device = 'jpeg')
+
+
+master <- read.csv('data/master_phenology_repeated_splits.csv') %>% 
+  filter(repetition == 1) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(location = unique(location)) %>% 
+  mutate(cultivar_type = 'local calibration')
+
+fail_sum <- pheno_and_window %>% 
+  merge(master, by = c('species', 'cultivar', 'location'), all.x = TRUE) %>% 
+  mutate(out = pheno_predicted > 213,
+         cultivar_type = replace_na(cultivar_type, 'projected')) %>% 
+  group_by(species, species_label, location, loc, spec, cultivar_type) %>% 
+  summarise(out = (sum(out) / n())* 100) %>% 
+  mutate(location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')))
+
+
+
+
+
+twindow <- thermal_time_window %>% 
+  mutate(loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))),
+         species = stringr::str_to_title(species),
+         spec = as.numeric(factor(species, levels = c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry',  'Almond', 'Pistachio' ))), 
+         flowering_label = recode(flowering_type, begin_flowering_f5 = '10% Flowering',
+                                  flowering_f50 = '50% Flowering'),
+         species_label = recode(species, 
+                                `European Plum` = 'Europ. Plum')) %>% 
+  mutate(species_label = factor(species_label, levels =c('Apple','Pear',  'Apricot', 'Europ. Plum', 'Sweet Cherry', 'Almond', 'Pistachio'))) %>% 
+  mutate(spec_loc = paste0(species, '_', location),
+         fill_label = ifelse(spec_loc %in% c('Almond_Klein-Altendorf', 'Pistachio_Klein-Altendorf', 'Almond_Zaragoza', 'Pistachio_Zaragoza',
+                                             'Apple_Sfax', 'Pear_Sfax', 'Apricot_Sfax', 'European Plum_Sfax', 'Sweet Cherry_Sfax'), yes = 'Type1', 
+                             no = ifelse(spec_loc %in%    c('Almond_Meknes', 'Almond_Sfax', 'Almond_Santomera',
+                                                            'Apple_Meknes', 'Apple_Klein-Altendorf',
+                                                            'Pear_Klein-Altendorf', 'Pear_Zaragoza',
+                                                            'Apricot_Cieza', 'Apricot_Zaragoza',
+                                                            'Sweet Cherry_Zaragoza', 'Sweet Cherry-Klein-Altendorf',
+                                                            'European Plum_Klein-Altendorf',
+                                                            'Pistachio_Sfax'), yes = 'Type2', no = 'Other')))
+
+twindow2 <- twindow %>% 
+  mutate(cultivar_type = 'projected')
+
+twindow <- twindow %>% 
+  mutate(cultivar_type = 'local calibration') %>% 
+  rbind(twindow2) %>% 
+  mutate(year = NA,
+         pheno_predicted = NA,
+         sd = NA,
+         gcm = NA,
+         ssp = NA,
+         scenario_year = NA,
+         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         cultivar = NA,
+         max_doy_padded = ifelse(max_doy_padded >= 182, yes = 181, no = max_doy_padded))
+
+#colnames(twindow) %in% colnames(test)
+
+
+
+pheno_and_window %>% 
+  merge(master, by = c('species', 'cultivar', 'location'), all.x = TRUE) %>% 
+  mutate( cultivar_type = replace_na(cultivar_type, 'projected')) %>% 
+  mutate(location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         max_doy_padded = ifelse(max_doy_padded >= 182, yes = 181, no = max_doy_padded)) %>% 
+  filter(pheno_predicted <= 182) %>% 
+  rbind(twindow) %>% 
+  ggplot(aes(y = spec)) +
+  geom_rect(aes(xmin = min(pheno_predicted, na.rm = TRUE)-10, xmax = min_doy_padded - 1, ymin = spec-0.5, ymax = spec+0.5),fill = 'grey70') +
+  geom_rect(aes(xmin = max_doy_padded + 1, xmax = 212, ymin = spec-0.5, ymax = spec+0.5),fill = 'grey70') +
+  #geom_tile(aes(xmin = 213, xmax = 242, ymin = spec-0.5, ymax = spec+0.5, fill = out)) +
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 0.5),fill = 'grey70') +
+  geom_rect(aes(xmin =182, xmax = 220, ymin = -Inf, ymax = Inf),fill = 'white') +
+  geom_point(data = fail_sum, aes(x=205, y= spec, color=out), shape=15, size=7.5) +
+  geom_point(data = fail_sum,aes(x=202, y= spec, color=out), shape=15, size=7.5) +
+  geom_point(data = fail_sum,aes(x=199, y= spec, color=out), shape=15, size=7.5) +
+  geom_point(data = fail_sum,aes(x=196, y= spec, color=out), shape=15, size=7.5) +
+  geom_point(data = fail_sum,aes(x=193, y= spec, color=out), shape=15, size=7.5) +
+  geom_point(data = fail_sum,aes(x=190, y= spec, color=out), shape=15, size=7.5) +
+  geom_point(data = fail_sum,aes(x=187, y= spec, color=out), shape=15, size=7.5) +
+  #geom_point(data = fail_sum,aes(x=186, y= spec, color=out), shape=15, size=7.5) +
+  geom_boxplot(aes(y = spec, x = pheno_predicted, group = spec, fill = as.factor(spec)), width = 0.6, show.legend = FALSE) +
+  geom_text(y = 0, x = 182 + 1, 
+            aes(label = 'No Pred.'),hjust = 0) +
+  geom_text(data = fail_sum, aes(x = 182 + 13, y = spec,  
+                label = paste0(format(round(out, digits = 1), nsmall = 1), '%'))) +
+  scale_y_reverse(breaks = 1:7, labels = c('Apple', 'Pear', 'Apricot', 'Europ. Plum', 'Sweet Cherry', 'Almond', 'Pistachio')) +
+  scale_x_continuous(breaks=        c(-31,  0, 32, 60,  91, 121, 152), 
+                     minor_breaks = c(-45, -15, 15, 46, 74, 105, 135, 166), 
+                     labels = c('Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun')) +
+  scale_fill_manual(values = c("#009E73", "#009E73", "#E69F00","#E69F00" ,"#E69F00", "#56B4E9", "#56B4E9" ) )+
+  scale_colour_gradient(low = "white", high = "firebrick2", limits = c(0, 100), name = 'Cases thermal requirements were not met (%)') +
+  scale_size_area(limits = c(0, 100), breaks = c(20, 40, 60, 80, 100),max_size = 8) +
+  geom_vline(xintercept = 182)+
+  xlab('Month') +
+  ylab('') +
+  facet_grid(location~cultivar_type) +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom')  +
+  coord_cartesian(xlim = c(-45, 199),
+                  ylim = c(7, 0))
+ggsave('figures/paper/time_window_and_current_prediction_v4.jpeg', height = 35, width = 35, units = 'cm', device = 'jpeg')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+pheno_and_window %>% 
+  merge(fail_sum, by = c('species', 'species_label', 'location', 'loc', 'spec')) %>% 
+  mutate(location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         alpha = ifelse(out >= 50, yes = alpha_fail, no = alpha_okay),
+         max_doy_padded = ifelse(max_doy_padded >= 182, yes = 181, no = max_doy_padded)) %>% 
+  filter(pheno_predicted <= 182) %>% 
+  ggplot(aes(y = spec)) +
+  #geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = spec-0.4, ymax = spec+0.4),fill = 'grey60') +
+  geom_rect(aes(xmin = min(pheno_predicted)-10, xmax = min_doy_padded - 1, ymin = spec-0.5, ymax = spec+0.5),fill = 'grey70') +
+  geom_rect(aes(xmin = max_doy_padded + 1, xmax = 212, ymin = spec-0.5, ymax = spec+0.5),fill = 'grey70') +
+  #geom_tile(aes(xmin = 213, xmax = 242, ymin = spec-0.5, ymax = spec+0.5, fill = out)) +
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 0.5),fill = 'grey70') +
+  geom_rect(aes(xmin =182, xmax = 220, ymin = -0.5, ymax = 0.5),fill = 'white') +
+  geom_point(aes(x=205, y= spec, color=out), shape=15, size=7.5) +
+  geom_point(aes(x=202, y= spec, color=out), shape=15, size=7.5) +
+  geom_point(aes(x=199, y= spec, color=out), shape=15, size=7.5) +
+  geom_point(aes(x=196, y= spec, color=out), shape=15, size=7.5) +
+  geom_point(aes(x=193, y= spec, color=out), shape=15, size=7.5) +
+  geom_point(aes(x=190, y= spec, color=out), shape=15, size=7.5) +
+  geom_point(aes(x=187, y= spec, color=out), shape=15, size=7.5) +
+  geom_point(aes(x=184.5, y= spec, color=out), shape=15, size=7.5) +
+  scale_colour_gradient(low = "white", high = "firebrick2", limits = c(0, 100)) +
+  geom_boxplot(aes(y = spec, x = pheno_predicted, group = spec, fill = as.factor(spec)), width = 0.6, show.legend = FALSE) +
+  scale_alpha_discrete(range=c(1,0.2)) +
+  geom_text(y = 0, x = 182 + 2, 
+            aes(label = 'No Prediction'),hjust = 0) +
+  geom_text(aes(x = 182 + 10, y = spec,  
+                label = paste(format(round(out, digits = 1), nsmall = 1), '%'))) +
+  scale_y_reverse(breaks = 1:7, labels = c('Apple', 'Pear', 'Apricot', 'Europ. Plum', 'Sweet Cherry', 'Almond', 'Pistachio')) +
+  scale_x_continuous(breaks=        c(-31,  0, 32, 60,  91, 121, 152), 
+                     minor_breaks = c(-45, -15, 15, 46, 74, 105, 135, 166), 
+                     labels = c('Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun')) +
+  scale_fill_manual(values = c("#009E73", "#009E73", "#E69F00","#E69F00" ,"#E69F00", "#56B4E9", "#56B4E9" ) )+
+  scale_size_area(limits = c(0, 100), breaks = c(20, 40, 60, 80, 100),max_size = 8) +
+  geom_vline(xintercept = 182)+
+  xlab('Month') +
+  ylab('') +
+  facet_grid(location~.) +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom')  +
+  coord_cartesian(xlim = c(-45, 195),
+                  ylim = c(7, 0))
+ggsave('figures/paper/time_window_and_current_prediction_v3.jpeg', height = 35, width = 35, units = 'cm', device = 'jpeg')
+
+
+
+
+
+
+
+
+
+  
+
+
+pheno_and_window <- test %>% 
+  mutate(loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))),
+         species = stringr::str_to_title(species),
+         spec = as.numeric(factor(species, levels = c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry',  'Almond', 'Pistachio' ))),
+         species_label = recode(species, 
+                                `European Plum` = 'Europ. Plum')) %>% 
+  mutate(species_label = factor(species_label, levels =c('Apple','Pear',  'Apricot', 'Europ. Plum', 'Sweet Cherry', 'Almond', 'Pistachio'))) %>% 
+  mutate(spec_loc = paste0(species, '_', location),
+         fill_label = ifelse(spec_loc %in% c('Almond_Klein-Altendorf', 'Pistachio_Klein-Altendorf', 'Almond_Zaragoza', 'Pistachio_Zaragoza',
+                                             'Apple_Sfax', 'Pear_Sfax', 'Apricot_Sfax', 'European Plum_Sfax', 'Sweet Cherry_Sfax'), yes = 'Type1', 
+                             no = ifelse(spec_loc %in%    c('Almond_Meknes', 'Almond_Sfax', 'Almond_Santomera',
+                                                            'Apple_Meknes', 'Apple_Klein-Altendorf',
+                                                            'Pear_Klein-Altendorf', 'Pear_Zaragoza',
+                                                            'Apricot_Cieza', 'Apricot_Zaragoza',
+                                                            'Sweet Cherry_Zaragoza', 'Sweet Cherry-Klein-Altendorf',
+                                                            'European Plum_Klein-Altendorf',
+                                                            'Pistachio_Sfax'), yes = 'Type2', no = 'Other'))) %>% 
+  merge(pheno_current, by = c('species', 'species_label', 'loc', 'location'), all.y = TRUE)
+
+
+
+# pheno_and_window %>% 
+#   merge(fail_sum, by = c('species', 'species_label', 'location', 'loc', 'spec')) %>% 
+#   mutate(location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+#          alpha = ifelse(out >= 50, yes = alpha_fail, no = alpha_okay),
+#          max_doy_padded = ifelse(max_doy_padded >= 182, yes = 181, no = max_doy_padded)) %>% 
+#   filter(pheno_predicted <= 182) %>% 
+#   ggplot(aes(y = spec)) +
+#   #geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = spec-0.4, ymax = spec+0.4),fill = 'grey60') +
+#   geom_rect(aes(xmin = min(pheno_predicted)-10, xmax = min_doy_padded - 1, ymin = spec-0.5, ymax = spec+0.5),fill = 'grey70') +
+#   geom_rect(aes(xmin = max_doy_padded + 1, xmax = 243, ymin = spec-0.5, ymax = spec+0.5),fill = 'grey70') +
+#   geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 0.5),fill = 'grey70') +
+#   geom_boxplot(aes(y = spec, x = pheno_predicted, group = spec, fill = as.factor(spec),
+#                    alpha = alpha), width = 0.6, show.legend = FALSE) +
+#   scale_alpha_discrete(range=c(1,0.2)) +
+#   geom_text(y = 0, x = 182 + 2, 
+#             aes(label = 'No Prediction'),hjust = 0) +
+#   geom_text(aes(x = 182 + 10, y = spec,  
+#                 label = paste(format(round(out, digits = 1), nsmall = 1), '%'))) +
+#   scale_y_reverse(breaks = 1:7, labels = c('Apple', 'Pear', 'Apricot', 'Europ. Plum', 'Sweet Cherry', 'Almond', 'Pistachio')) +
+#   scale_x_continuous(breaks=        c(-31,  0, 32, 60,  91, 121, 152, 182), 
+#                      minor_breaks = c(-45, -15, 15, 46, 74, 105, 135, 166), 
+#                      labels = c('Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul')) +
+#   scale_fill_manual(values = c("#009E73", "#009E73", "#E69F00","#E69F00" ,"#E69F00", "#56B4E9", "#56B4E9" ) )+
+#   scale_size_area(limits = c(0, 100), breaks = c(20, 40, 60, 80, 100),max_size = 8) +
+#   geom_vline(xintercept = 182, linetype = 'dashed')+
+#   xlab('Month') +
+#   ylab('') +
+#   facet_grid(location~.) +
+#   theme_bw(base_size = 15) +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom')  +
+#   coord_cartesian(xlim = c(-45, 195),
+#                   ylim = c(7, 0))
+# ggsave('figures/paper/current_prediction_fixed_rsik_timewindow.jpeg', height = 35, width = 35, units = 'cm', device = 'jpeg')
+
+
+#split the figure based for which locations the models have been fitted
+
+cult_loc <- read.csv('data/master_phenology_repeated_splits.csv') %>% 
+  mutate(species = recode(species, `Japanese Plum` = 'European Plum')) %>% 
+  group_by(species, cultivar) %>% 
+  summarise(location = unique(location)) %>% 
+  mutate(type = 'l')
+  
+
+
+pheno_and_window %>% 
+  merge(fail_sum, by = c('species', 'species_label', 'location', 'loc', 'spec')) %>% 
+  mutate(location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         alpha = ifelse(out >= 50, yes = alpha_fail, no = alpha_okay),
+         max_doy_padded = ifelse(max_doy_padded >= 182, yes = 181, no = max_doy_padded)) %>% 
+  merge(cult_loc, by = c('species', 'location', 'cultivar'), all.x = TRUE) %>% 
+  mutate(type = replace_na(type, 'p')) %>% 
+  filter(pheno_predicted <= 182) %>% 
+  filter((species %in% c('Apple', 'Pear', 'European Plum', 'Sweet Cherry') & location == 'Klein-Altendorf')|
+           (species %in% c('Pear', 'Apricot', 'Sweet Cherry') & location == 'Zaragoza') |
+           (species == 'Apricot' & location == 'Cieza') |
+           (species == 'Almond' & location == 'Santomera') |
+           (species %in% c('Apple', 'Almond') & location == 'Meknes') |
+           (species %in% c('Almond', 'Pistachio') & location == 'Sfax')) %>% 
+  ggplot(aes(y = spec)) +
+  #geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = spec-0.4, ymax = spec+0.4),fill = 'grey60') +
+  geom_boxplot(aes(y = spec, x = pheno_predicted, fill = paste0(type,spec), group = paste0(type,spec)), width = 0.6, show.legend = FALSE) +
+  scale_alpha_discrete(range=c(1,0.2)) +
+  geom_text(y = 0, x = 182 + 2, 
+            aes(label = 'No Prediction'),hjust = 0) +
+  geom_text(aes(x = 182 + 10, y = spec,  
+                label = paste(format(round(out, digits = 1), nsmall = 1), '%'))) +
+  scale_y_reverse(breaks = 1:7, labels = c('Apple', 'Pear', 'Apricot', 'Europ. Plum', 'Sweet Cherry', 'Almond', 'Pistachio')) +
+  scale_x_continuous(breaks=        c(-31,  0, 32, 60,  91, 121, 152, 182), 
+                     minor_breaks = c(-45, -15, 15, 46, 74, 105, 135, 166), 
+                     labels = c('Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', '')) +
+  scale_fill_manual(values = c("#009E73", "#009E73", "#E69F00","#E69F00" ,"#E69F00", "#56B4E9", "#56B4E9",
+                               "#00ebab", "#00ebab", "#ffc034" ,"#ffc034", "#9ad2f2", "#9ad2f2") )+
+  scale_size_area(limits = c(0, 100), breaks = c(20, 40, 60, 80, 100),max_size = 8) +
+  geom_vline(xintercept = 182, linetype = 'dashed')+
+  xlab('Month') +
+  ylab('') +
+  facet_grid(location~., scales = 'free_y') +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom')  +
+  coord_cartesian(xlim = c(-5, 195))
+ggsave('figures/distressing_stuff.jpeg', height = 25, width = 20, units = 'cm', device = 'jpeg')
+
+
+
+pheno_and_window %>% 
+  merge(fail_sum, by = c('species', 'species_label', 'location', 'loc', 'spec')) %>% 
+  mutate(location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         alpha = ifelse(out >= 50, yes = alpha_fail, no = alpha_okay),
+         max_doy_padded = ifelse(max_doy_padded >= 182, yes = 181, no = max_doy_padded)) %>% 
+  merge(cult_loc, by = c('species', 'location', 'cultivar'), all.x = TRUE) %>% 
+  mutate(type = replace_na(type, 'p')) %>% 
+  filter(pheno_predicted <= 182) %>% 
+  ggplot(aes(y = spec)) +
+  #geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = spec-0.4, ymax = spec+0.4),fill = 'grey60') +
+  geom_boxplot(aes(y = spec, x = pheno_predicted, fill = paste0(type,spec), group = paste0(type,spec)), width = 0.6, show.legend = FALSE) +
+  scale_alpha_discrete(range=c(1,0.2)) +
+  geom_text(y = 0, x = 182 + 2, 
+            aes(label = 'No Prediction'),hjust = 0) +
+  geom_text(aes(x = 182 + 10, y = spec,  
+                label = paste(format(round(out, digits = 1), nsmall = 1), '%'))) +
+  scale_y_reverse(breaks = 1:7, labels = c('Apple', 'Pear', 'Apricot', 'Europ. Plum', 'Sweet Cherry', 'Almond', 'Pistachio')) +
+  scale_x_continuous(breaks=        c(-31,  0, 32, 60,  91, 121, 152, 182), 
+                     minor_breaks = c(-45, -15, 15, 46, 74, 105, 135, 166), 
+                     labels = c('Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul')) +
+  scale_fill_manual(values = c("#009E73", "#009E73", "#E69F00","#E69F00" ,"#E69F00", "#56B4E9", "#56B4E9",
+                               "#00ebab", "#00ebab", "#ffc034","#ffc034" ,"#ffc034", "#9ad2f2", "#9ad2f2") )+
+  scale_size_area(limits = c(0, 100), breaks = c(20, 40, 60, 80, 100),max_size = 8) +
+  geom_vline(xintercept = 182, linetype = 'dashed')+
+  xlab('Month') +
+  ylab('') +
+  facet_grid(location~.) +
+  theme_bw(base_size = 15) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom')  +
+  coord_cartesian(xlim = c(-45, 195),
+                  ylim = c(7, 0))
+
+
+ggsave('figures/paper/current_prediction_no_timewindow.jpeg', height = 35, width = 35, units = 'cm', device = 'jpeg')
+
+
+
+# 
+# pheno_and_window %>% 
+#   merge(fail_sum, by = c('species', 'species_label', 'location', 'loc', 'spec')) %>% 
+#   mutate(location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+#          alpha = ifelse(out >= 50, yes = alpha_fail, no = alpha_okay),
+#          max_doy_padded = ifelse(max_doy_padded >= 182, yes = 181, no = max_doy_padded)) %>% 
+#   mutate(pheno_predicted = recode(pheno_predicted, `9999` = 185)) %>% 
+#   ggplot(aes(y = spec)) +
+#   #geom_rect(aes(xmin = min_doy_padded, xmax = max_doy_padded, ymin = spec-0.4, ymax = spec+0.4),fill = 'grey60') +
+#   geom_rect(aes(xmin = min(pheno_predicted)-10, xmax = min_doy_padded - 1, ymin = spec-0.5, ymax = spec+0.5),fill = 'grey70') +
+#   geom_rect(aes(xmin = max_doy_padded + 1, xmax = 243, ymin = spec-0.5, ymax = spec+0.5),fill = 'grey70') +
+#   geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 0.5),fill = 'grey70') +
+#   geom_boxplot(aes(y = spec, x = pheno_predicted, group = spec, fill = as.factor(spec)), width = 0.6, show.legend = FALSE) +
+#   geom_text(y = 0, x = 182 + 2, 
+#             aes(label = 'No Prediction'),hjust = 0) +
+#   geom_text(aes(x = 182 + 10, y = spec,  
+#                 label = paste(format(round(out, digits = 1), nsmall = 1), '%'))) +
+#   scale_y_reverse(breaks = 1:7, labels = c('Apple', 'Pear', 'Apricot', 'Europ. Plum', 'Sweet Cherry', 'Almond', 'Pistachio')) +
+#   scale_x_continuous(breaks=        c(-31,  0, 32, 60,  91, 121, 152, 182), 
+#                      minor_breaks = c(-45, -15, 15, 46, 74, 105, 135, 166), 
+#                      labels = c('Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul')) +
+#   scale_fill_manual(values = c("#009E73", "#009E73", "#E69F00","#E69F00" ,"#E69F00", "#56B4E9", "#56B4E9" ) )+
+#   scale_size_area(limits = c(0, 100), breaks = c(20, 40, 60, 80, 100),max_size = 8) +
+#   geom_vline(xintercept = 182, linetype = 'dashed')+
+#   xlab('Month') +
+#   ylab('') +
+#   facet_grid(location~.) +
+#   theme_bw(base_size = 15) +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = 'bottom')  +
+#   coord_cartesian(xlim = c(-45, 195),
+#                   ylim = c(7, 0))
+# 
+# ggsave('figures/paper/time_window_and_current_prediction_v2.jpeg', height = 35, width = 35, units = 'cm', device = 'jpeg')
+
+
+
+
 
 #----------------------------------#
 #change bloom date
@@ -748,7 +1109,12 @@ median_future <- pheno_future %>%
 shift_df <- merge(median_2015, median_future, by = c('species','location')) %>% 
   mutate(shift_bloom = round(med_future - med_current, digits = 2))
 
+shift_table <- shift_df %>% 
+  group_by(species, location, scenario_year, ssp) %>% 
+  summarise(min_shift = min(shift_bloom, na.rm = TRUE),
+            max_shift = max(shift_bloom, na.rm = TRUE))
 
+write.csv(shift_table, 'data/summary_shift_bloom_date_text.csv', row.names = FALSE)
 
 
 #merge the two
@@ -780,7 +1146,7 @@ shift_df %>%
   xlab('Median Predicted Bloom Date') +
   guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
 ggplot2::ggsave('figures/paper/change_med_bloom_2050_v1.jpeg', device = 'jpeg',
-                height = 27, width = 31, units = 'cm')
+                height = 40, width = 31, units = 'cm')
 
 
 shift_df %>% 
@@ -811,7 +1177,7 @@ shift_df %>%
   xlab('Median Predicted Bloom Date') +
   guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
 ggplot2::ggsave('figures/paper/change_med_bloom_2085_v1.jpeg', device = 'jpeg',
-                height = 27, width = 31, units = 'cm')
+                height = 40, width = 31, units = 'cm')
 
 shift_df %>% 
 mutate(dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
@@ -842,7 +1208,7 @@ mutate(dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 
   xlab('Median Predicted Bloom Date') +
   guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
 ggplot2::ggsave('figures/paper/change_med_bloom_2050_v2.jpeg', device = 'jpeg',
-                height = 27, width = 31, units = 'cm')
+                height = 40, width = 31, units = 'cm')
 
 
 shift_df %>% 
@@ -874,7 +1240,111 @@ shift_df %>%
   xlab('Median Predicted Bloom Date') +
   guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
 ggplot2::ggsave('figures/paper/change_med_bloom_2085_v2.jpeg', device = 'jpeg',
-                height = 27, width = 31, units = 'cm')
+                height = 40, width = 31, units = 'cm')
+
+
+
+#change species and location
+fail_2015 <- read.csv('data/failure-rate_thermal-risk_2020-sim.csv') %>% 
+  filter(cultivar %in% cultivar_n) %>% 
+  mutate(species = stringr::str_to_title(species)) %>% 
+  group_by(species, location) %>% 
+  summarise(failure_rate = median(failure_rate))
+
+med_bloom_2015 <- median_2015 %>% 
+  merge(fail_2015, by = c('species', 'location')) %>% 
+  mutate(         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+                  species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio')),
+                  spec = as.numeric(species),
+                  loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))),
+                  alpha = ifelse(failure_rate >= 50, yes = 0.5, no = 1))
+
+alpha_fail <- 0.75
+#only do it for the cases when thermal requirements are not met
+alpha_df <- fail_sum %>% 
+  mutate(         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+                  species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio')),
+                  spec = as.numeric(species),
+                  loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))),
+                  alpha = ifelse(out >= 50, yes = alpha_fail, no = 1)) %>% 
+  merge(median_2015, by = c('species', 'location'))
+
+  
+
+shift_df %>% 
+  mutate(dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2),
+         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio')),
+         spec = as.numeric(species),
+         loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))),
+         med_future = ifelse(is.na(med_current), yes = NA, no = med_future)) %>% 
+  merge(alpha_df, by = c('species', 'location', 'loc', 'spec', 'med_current', 'sd_current')) %>% 
+  mutate(alpha = ifelse(out >= 50, yes = alpha_fail, no = 1)) %>% 
+  filter(scenario_year == '2050') %>% 
+  ggplot(ggplot2::aes(y = loc)) +
+  geom_rect(aes(xmin = med_current, xmax = med_future, ymin = loc + dodge_low, ymax = loc + dodge_up, fill = ssp, alpha = alpha)) +
+  geom_point(aes(x = med_future, y = loc + ((dodge_low + dodge_up)/2),
+                 alpha = alpha + 0.1),
+             col = 'black',
+             show.legend = FALSE, shape = 4, size = 1) + 
+  geom_rect(data = alpha_df, aes(xmin = med_current - 0.5, xmax = med_current + 0.5, ymax = loc - 0.4, ymin = loc + 0.4, fill = 'Simulation 2015',
+                                       alpha = alpha + 0.1),  size = 2) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species~., scales = 'free_y', space = 'free_y') +
+  scale_alpha_continuous(guide=FALSE) +
+  scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(values = c('black', "#56B4E9", "#009E73","#F0E442",  "#E69F00", 'grey70'))+
+  theme_bw(base_size = 15) +
+  scale_x_continuous(breaks = c(32,  60, 91, 121, 152), 
+                     labels = c('Feb', 'Mar', 'Apr', 'May', 'Jun'),
+                     minor_breaks = c(1, 32, 60, 91, 121, 152)) +
+  scale_y_reverse(breaks = rep(1:6,7), labels = rep(c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'), 7)) +
+  coord_cartesian(xlim = c(32, 155)) +
+  theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  ylab('') +
+  xlab('Median Predicted Bloom Date') +
+  guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
+ggplot2::ggsave('figures/paper/change_med_bloom_2050_v3.jpeg', device = 'jpeg',
+                height = 40, width = 31, units = 'cm')
+
+
+shift_df %>% 
+  mutate(dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2),
+         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio')),
+         spec = as.numeric(species),
+         loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))),
+         med_future = ifelse(is.na(med_current), yes = NA, no = med_future)) %>% 
+  merge(alpha_df, by = c('species', 'location', 'loc', 'spec', 'med_current', 'sd_current')) %>% 
+  mutate(alpha = ifelse(out >= 50, yes = alpha_fail, no = 1)) %>% 
+  filter(scenario_year == '2085') %>% 
+  ggplot(ggplot2::aes(y = loc)) +
+  geom_rect(aes(xmin = med_current, xmax = med_future, ymin = loc + dodge_low, ymax = loc + dodge_up, fill = ssp, alpha = alpha)) +
+  geom_point(aes(x = med_future, y = loc + ((dodge_low + dodge_up)/2),
+                 alpha = alpha + 0.1),
+             col = 'black',
+             show.legend = FALSE, shape = 4, size = 1) + 
+  geom_rect(data = alpha_df, aes(xmin = med_current - 0.5, xmax = med_current + 0.5, ymax = loc - 0.4, ymin = loc + 0.4, fill = 'Simulation 2015',
+                                 alpha = alpha + 0.1),  size = 2) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species~., scales = 'free_y', space = 'free_y') +
+  scale_alpha_continuous(guide=FALSE) +
+  scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(values = c('black', "#56B4E9", "#009E73","#F0E442",  "#E69F00", 'grey70'))+
+  theme_bw(base_size = 15) +
+  scale_x_continuous(breaks = c(32,  60, 91, 121, 152), 
+                     labels = c('Feb', 'Mar', 'Apr', 'May', 'Jun'),
+                     minor_breaks = c(1, 32, 60, 91, 121, 152)) +
+  scale_y_reverse(breaks = rep(1:6,7), labels = rep(c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'), 7)) +
+  coord_cartesian(xlim = c(32, 155)) +
+  theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1), legend.position = 'bottom') +
+  ylab('') +
+  xlab('Median Predicted Bloom Date') +
+  guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
+ggplot2::ggsave('figures/paper/change_med_bloom_2085_v3.jpeg', device = 'jpeg',
+                height = 40, width = 31, units = 'cm')
 
 
 
@@ -1023,9 +1493,9 @@ pos_plot_pistachio <- c(cult_num_df$cult_num[pos_label_pistachio[1]], cult_num_d
 
 p1 <- shift_df %>% 
   merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
-  mutate(species_label = recode(species, `European Plum` = 'ep',
-                                Pistachio = 'pi'),
-         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'Pear', 'pi', 'Sweet Cherry')),
+  mutate(species_label = recode(species, `European Plum` = 'EP',
+                                Pistachio = 'Pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'EP', 'Pear', 'Pi', 'Sweet Cherry')),
          location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
                            Meknes = 'Mekn.',
                            Santomera = 'Santo.',
@@ -1066,9 +1536,9 @@ p1 <- shift_df %>%
 
 p2 <- shift_df %>% 
   merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
-  mutate(species_label = recode(species, `European Plum` = 'ep',
-                                Pistachio = 'pi'),
-         species_label = factor(species_label, levels = c('Apple', 'Pear', 'Sweet Cherry', 'ep', 'Apricot', 'Almond', 'pi')),
+  mutate(species_label = recode(species, `European Plum` = 'EP',
+                                Pistachio = 'Pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'EP', 'Pear', 'Pi', 'Sweet Cherry')),
          location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
                            Meknes = 'Mekn.',
                            Santomera = 'Santo.',
@@ -1109,16 +1579,16 @@ p2 <- shift_df %>%
 
 p1 + p2 + plot_layout(guides = 'collect') & ggplot2::theme(legend.position= 'bottom') 
 ggplot2::ggsave('figures/paper/change_med_bloom_2050_cult.jpeg', device = 'jpeg',
-                height = 27, width = 31, units = 'cm')
+                height = 40, width = 31, units = 'cm')
 
 
 
 
 p1 <- shift_df %>% 
   merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
-  mutate(species_label = recode(species, `European Plum` = 'ep',
-                                Pistachio = 'pi'),
-         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'Pear', 'pi', 'Sweet Cherry')),
+  mutate(species_label = recode(species, `European Plum` = 'EP',
+                                Pistachio = 'Pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'EP', 'Pear', 'Pi', 'Sweet Cherry')),
          location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
                            Meknes = 'Mekn.',
                            Santomera = 'Santo.',
@@ -1159,9 +1629,9 @@ p1 <- shift_df %>%
 
 p2 <- shift_df %>% 
   merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
-  mutate(species_label = recode(species, `European Plum` = 'ep',
-                                Pistachio = 'pi'),
-         species_label = factor(species_label, levels = c('Apple', 'Pear', 'Sweet Cherry', 'ep', 'Apricot', 'Almond', 'pi')),
+  mutate(species_label = recode(species, `European Plum` = 'EP',
+                                Pistachio = 'Pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'EP', 'Pear', 'Pi', 'Sweet Cherry')),
          location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
                            Meknes = 'Mekn.',
                            Santomera = 'Santo.',
@@ -1202,7 +1672,7 @@ p2 <- shift_df %>%
 
 p1 + p2 + plot_layout(guides = 'collect') & ggplot2::theme(legend.position= 'bottom') 
 ggplot2::ggsave('figures/paper/change_med_bloom_2085_cult.jpeg', device = 'jpeg',
-                height = 27, width = 31, units = 'cm')
+                height = 40, width = 31, units = 'cm')
 
 
 
@@ -1251,7 +1721,7 @@ fail_future <- expand.grid(ssp, scenario_year, gcm, cultivar, location) %>%
 #--> make lookup table of species and cultivar
 
 
-ncult <- empty_fail %>% 
+ncult <- fail_future %>% 
   group_by(species) %>% 
   summarise(cult =unique(cultivar)) %>% 
   ungroup() %>% 
@@ -1266,15 +1736,27 @@ med_fut <- fail_future %>%
 
 
 
-shift_df <- med_hist %>% 
+shift_fail_df <- med_hist %>% 
   merge(med_fut, by = c('species',  'location')) %>% 
   mutate(species = stringr::str_to_title(species))
+
+
+fail_shift_df <- shift_fail_df %>% 
+  mutate(shift_fail = fut_fail - hist_fail) %>% 
+  group_by(species, location, scenario_year, ssp) %>% 
+  summarise(hist_fail = median(hist_fail),
+            min_fut_fail = min(fut_fail),
+            max_mut_fail = max(fut_fail),
+            min_shift = min(shift_fail, na.rm = TRUE),
+            max_shift = max(shift_fail, na.rm = TRUE))
+
+write.csv(fail_shift_df, 'data/summary_shift_failure_text.csv', row.names = FALSE)
 
 #I need this data also on a cultivar level!
 #re-run the necissary script
 
 
-shift_df %>% 
+shift_fail_df %>% 
   mutate(dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
          dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2),
          location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
@@ -1298,9 +1780,9 @@ shift_df %>%
   xlab('Median Predicted Bloom Failure Rate (%)') +
   guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
 ggplot2::ggsave('figures/paper/change_failure_bloom_2050_v2.jpeg', device = 'jpeg',
-                height = 27, width = 31, units = 'cm')
+                height = 40, width = 31, units = 'cm')
 
-shift_df %>% 
+shift_fail_df %>% 
   mutate(dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
          dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2),
          location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
@@ -1324,7 +1806,63 @@ shift_df %>%
   xlab('Median Predicted Bloom Failure Rate (%)') +
   guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
 ggplot2::ggsave('figures/paper/change_failure_bloom_2085_v2.jpeg', device = 'jpeg',
-                height = 27, width = 31, units = 'cm')
+                height = 40, width = 31, units = 'cm')
+
+
+
+shift_fail_df %>% 
+  mutate(dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2),
+         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio')),
+         spec = as.numeric(species),
+         loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')))) %>% 
+  filter(scenario_year == '2050') %>% 
+  ggplot(ggplot2::aes(y = loc)) +
+  geom_rect(aes(xmin = hist_fail, xmax = fut_fail, ymin = loc + dodge_low, ymax = loc + dodge_up, fill = ssp)) +
+  geom_point(aes(x = fut_fail, y = loc + ((dodge_low + dodge_up)/2)),
+             col = 'black',
+             show.legend = FALSE, shape = 4, size = 1) + 
+  geom_rect(aes(xmin = hist_fail - 0.25, xmax = hist_fail + 0.25, ymax = loc - 0.4, ymin = loc + 0.4, fill = 'Simulation 2015'),  size = 2) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species~., scales = 'free_y', space = 'free_y') +
+  scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(values = c('black', "#56B4E9", "#009E73","#F0E442",  "#E69F00", 'grey70'))+
+  theme_bw(base_size = 15) +
+  scale_y_reverse(breaks = rep(1:6,7), labels = rep( c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'), 7)) +
+  theme(legend.position = 'bottom') +
+  ylab('') +
+  xlab('Median Predicted Bloom Failure Rate (%)') +
+  guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
+ggplot2::ggsave('figures/paper/change_failure_bloom_2050_v3.jpeg', device = 'jpeg',
+                height = 40, width = 31, units = 'cm')
+
+shift_fail_df %>% 
+  mutate(dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2),
+         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio')),
+         spec = as.numeric(species),
+         loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')))) %>% 
+  filter(scenario_year == '2085') %>% 
+  ggplot(ggplot2::aes(y = loc)) +
+  geom_rect(aes(xmin = hist_fail, xmax = fut_fail, ymin = loc + dodge_low, ymax = loc + dodge_up, fill = ssp)) +
+  geom_point(aes(x = fut_fail, y = loc + ((dodge_low + dodge_up)/2)),
+             col = 'black',
+             show.legend = FALSE, shape = 4, size = 1) + 
+  geom_rect(aes(xmin = hist_fail - 0.25, xmax = hist_fail + 0.25, ymax = loc - 0.4, ymin = loc + 0.4, fill = 'Simulation 2015'),  size = 2) +
+  # geom_bar(stat = 'identity', position = 'dodge') +
+  facet_grid(species~., scales = 'free_y', space = 'free_y') +
+  scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(values = c('black', "#56B4E9", "#009E73","#F0E442",  "#E69F00", 'grey70'))+
+  theme_bw(base_size = 15) +
+  scale_y_reverse(breaks = rep(1:6,7), labels = rep( c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'), 7)) +
+  theme(legend.position = 'bottom') +
+  ylab('') +
+  xlab('Median Predicted Bloom Failure Rate (%)') +
+  guides(fill=ggplot2::guide_legend(title="Weather Scenario"))
+ggplot2::ggsave('figures/paper/change_failure_bloom_2085_v3.jpeg', device = 'jpeg',
+                height = 40, width = 31, units = 'cm')
 
 
 # shift_df %>% 
@@ -1367,7 +1905,7 @@ med_fut <- fail_future %>%
   group_by(species, location, scenario_year, gcm, ssp) %>% 
   summarise(fut_fail = median(failure_rate))
 
-shift_df <- fail_2015 %>% 
+shift_fail_df <- fail_2015 %>% 
   merge(fail_future, by = c('species', 'cultivar',  'location'), all.x = TRUE) %>% 
   mutate(species = stringr::str_to_title(species)) %>% 
   rename(hist_fail = failure_rate.x,
@@ -1375,14 +1913,14 @@ shift_df <- fail_2015 %>%
 
 
 #get number of cultivars
-ncult <- shift_df %>% 
+ncult <- shift_fail_df %>% 
   group_by(species) %>% 
   summarise(cult =unique(cultivar)) %>% 
   ungroup() %>% 
   nrow()
 
 #assign number to cultivars, keep order as in the plot
-cult_num_df <- shift_df %>% 
+cult_num_df <- shift_fail_df %>% 
   group_by(species) %>% 
   summarise(cultivar =unique(cultivar)) %>% 
   ungroup() %>% 
@@ -1412,11 +1950,11 @@ pos_label_pistachio <- c(min(which(cult_num_df$species == 'Pistachio')), max(whi
 pos_plot_pistachio <- c(cult_num_df$cult_num[pos_label_pistachio[1]], cult_num_df$cult_num[pos_label_pistachio[2]])
 
 
-p1 <- shift_df %>% 
+p1 <- shift_fail_df %>% 
   merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
-  mutate(species_label = recode(species, `European Plum` = 'ep',
-                                Pistachio = 'pi'),
-         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'Pear', 'pi', 'Sweet Cherry')),
+  mutate(species_label = recode(species, `European Plum` = 'EP',
+                                Pistachio = 'Pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'EP', 'Pear', 'Pi', 'Sweet Cherry')),
          location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
                            Meknes = 'Mekn.',
                            Santomera = 'Santo.',
@@ -1451,11 +1989,11 @@ p1 <- shift_df %>%
 
 
 
-p2 <- shift_df %>% 
+p2 <- shift_fail_df %>% 
   merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
-  mutate(species_label = recode(species, `European Plum` = 'ep',
-                                Pistachio = 'pi'),
-         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'Pear', 'pi', 'Sweet Cherry')),
+  mutate(species_label = recode(species, `European Plum` = 'EP',
+                                Pistachio = 'Pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'EP', 'Pear', 'Pi', 'Sweet Cherry')),
          location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
                            Meknes = 'Mekn.',
                            Santomera = 'Santo.',
@@ -1491,16 +2029,16 @@ p2 <- shift_df %>%
 
 p1 + p2 + plot_layout(guides = 'collect') & ggplot2::theme(legend.position= 'bottom') 
 ggplot2::ggsave('figures/paper/change_fail_2050_cult.jpeg', device = 'jpeg',
-                height = 27, width = 35, units = 'cm')
+                height = 40, width = 35, units = 'cm')
 
 
 
 
-p1 <- shift_df %>% 
+p1 <- shift_fail_df %>% 
   merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
-  mutate(species_label = recode(species, `European Plum` = 'ep',
-                                Pistachio = 'pi'),
-         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'ep', 'Pear', 'pi', 'Sweet Cherry')),
+  mutate(species_label = recode(species, `European Plum` = 'EP',
+                                Pistachio = 'Pi'),
+         species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'EP', 'Pear', 'Pi', 'Sweet Cherry')),
          location = recode(location, `Klein-Altendorf` = 'Kl.-Alt.',
                            Meknes = 'Mekn.',
                            Santomera = 'Santo.',
@@ -1535,7 +2073,7 @@ p1 <- shift_df %>%
 
 
 
-p2 <- shift_df %>% 
+p2 <- shift_fail_df %>% 
   merge.data.frame(cult_num_df, by = c('species', 'cultivar')) %>% 
   mutate(species_label = recode(species, `European Plum` = 'ep',
                                 Pistachio = 'pi'),
@@ -1575,7 +2113,7 @@ p2 <- shift_df %>%
 
 p1 + p2 + plot_layout(guides = 'collect') & ggplot2::theme(legend.position= 'bottom') 
 ggplot2::ggsave('figures/paper/change_fail_2085_cult.jpeg', device = 'jpeg',
-                height = 27, width = 35, units = 'cm')
+                height = 40, width = 35, units = 'cm')
 
 
 
