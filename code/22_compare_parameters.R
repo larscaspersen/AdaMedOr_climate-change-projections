@@ -118,6 +118,14 @@ library(rstatix)
 #-----------------------------#
 
 #apple
+y <- 1:100
+yc <- 80
+s1 <- 0.9
+
+sy = exp(s1*yc*((y-yc)/y))
+py = sy / (sy+1)
+plot(py)
+
 
 par_prep <- par_df %>% 
   merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
@@ -138,7 +146,6 @@ par_prep %>%
 #-----#
 
 #pear
-#apple
 
 par_prep <- par_df %>% 
   merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
@@ -161,7 +168,6 @@ par_prep %>%
 #-----#
 
 #sweet cherry
-#apple
 
 par_prep <- par_df %>% 
   merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
@@ -184,8 +190,6 @@ par_prep %>%
 
 
 #-----#
-
-#sweet cherry
 #apricot
 
 par_prep <- par_df %>% 
@@ -206,8 +210,219 @@ par_prep %>%
 
 
 
+#-----#
+#almond
+
+par_prep <- par_df %>% 
+  merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
+  filter(species == 'Almond') %>% 
+  mutate(loc_all = factor(loc_all, levels = c('Meknes_Santomera', 'Santomera', 'Meknes_Santomera_Sfax', 'Santomera_Sfax', 'Sfax')))
+
+comb_df <- expand.grid(c('Meknes_Santomera', 'Santomera', 'Meknes_Santomera_Sfax', 'Santomera_Sfax', 'Sfax'), 
+            c('Meknes_Santomera', 'Santomera', 'Meknes_Santomera_Sfax', 'Santomera_Sfax', 'Sfax')) %>% 
+  filter(Var1 != Var2) %>% 
+  mutate(comb = apply(., MARGIN = 1, function(i){
+    unlist(i) %>% 
+      sort() %>% 
+      paste(collapse = '-')
+  }),
+  un = duplicated(comb)) %>% 
+  filter(un == FALSE)
+
+combinations <- purrr::map(1:nrow(comb_df), function(i) as.character(c(comb_df$Var1[i], comb_df$Var2[i])))
 
 
+par_prep %>%
+  mutate(values_adj = ifelse(value == max(value), value + 20, value), .by = parameter,
+         parameter = factor(parameter, levels = c('yc', 'zc', 's1', 'Tu', 'theta_c', 'tau', 'pie_c', 'Tf', 'Tb', 'slope'))) %>% 
+  ggplot(aes(x = loc_all, y = values_adj)) +
+  geom_boxplot() +
+  stat_compare_means(method = "wilcox.test", aes(label = ..p.signif.., y = value), size = 5, 
+                     comparisons = combinations) +
+  facet_wrap( ~ parameter, scales = "free_y")+
+  scale_y_continuous(expand = c(.1, .1))
+
+
+
+
+
+
+#calculate the average temperature for these location in winter, assume equal contribution in mixtures
+temp_list <- list('Zaragoza' = zaragoza <- read.csv('data/weather_raw/temp_zgz_1973-2022.csv'),
+                  'CKA' = cka <- read.csv('data/weather_ready/temp_cka_1958-2022.csv'),
+                  'Cieza' = cieza <- readxl::read_xlsx('data/weather_raw/Cieza(95_22)Tmax&Tmin.xlsx'),
+                  'Sfax' = sfax <- read.csv('data/weather_ready/sfax_1973-2021_fixed.csv'),
+                  'Meknes' = meknes <- read.csv('data/weather_ready/meknes-bassatine-fixed_1973-2022.csv'),
+                  'Santomera' =  santomera <-read.csv('data/weather_ready/murcia_clean.csv'))
+
+tmeans <- purrr::map(temp_list, function(temp){
+   if('Month' %in% colnames(temp) == FALSE){
+     temp$Month <- lubridate::month(temp$Date)
+   }
+  
+  temp %>% 
+    filter(Month %in% c(11, 12, 1, 2, 3, 4),
+           Year > 1990 & Year <= 2020) %>%
+    mutate(Tmean = (Tmin + Tmax) / 2) %>% 
+    summarise(Tmean = mean(Tmean)) %>% 
+    pull(Tmean)
+}) %>% 
+  bind_rows(.id = 'Location') %>% 
+  mutate(`CKA_Meknes` = (CKA + Meknes) / 2,
+         `Zaragoza_Cieza` = (Zaragoza + Cieza) / 2,
+         `CKA_Zaragoza` = (CKA + Zaragoza) / 2,
+         `Meknes_Santomera` = (Meknes + Santomera) / 2,
+         `Meknes_Santomera_Sfax` = (Meknes + Santomera + Sfax) / 3,
+         `Santomera_Sfax` = (Santomera + Sfax) / 2) %>% 
+  pivot_longer(cols = everything(), names_to = 'location') %>% 
+  arrange(value)
+
+
+#plot the parameters together spitted by species
+par_df %>% 
+  merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
+  filter(species %in% c('Pistachio', 'European Plum') == FALSE,
+         parameter == 'yc') %>% 
+  mutate(loc_all = gsub('Klein-Altendorf', 'CKA', loc_all),
+         loc_all = recode(loc_all, `Cieza_Zaragoza` = 'Zaragoza_Cieza'),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'Sweet Cherry', 'Almond')),
+         loc_all = factor(loc_all, levels = tmeans$location)) %>% 
+  ggplot(aes(x = loc_all, y = value)) +
+  geom_boxplot() +
+  ggtitle('yc') +
+  facet_wrap(~species, scales = 'free_x')
+
+par_df %>% 
+  merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
+  filter(species %in% c('Pistachio', 'European Plum') == FALSE,
+         parameter == 'zc') %>% 
+  mutate(loc_all = gsub('Klein-Altendorf', 'CKA', loc_all),
+         loc_all = recode(loc_all, `Cieza_Zaragoza` = 'Zaragoza_Cieza'),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'Sweet Cherry', 'Almond')),
+         loc_all = factor(loc_all, levels = tmeans$location)) %>% 
+  ggplot(aes(x = loc_all, y = value)) +
+  geom_boxplot() +
+  ggtitle('zc') +
+  facet_wrap(~species, scales = 'free_x')
+
+par_df %>% 
+  merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
+  filter(species %in% c('Pistachio', 'European Plum') == FALSE,
+         parameter == 'pie_c') %>% 
+  mutate(loc_all = gsub('Klein-Altendorf', 'CKA', loc_all),
+         loc_all = recode(loc_all, `Cieza_Zaragoza` = 'Zaragoza_Cieza'),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'Sweet Cherry', 'Almond')),
+         loc_all = factor(loc_all, levels = tmeans$location)) %>% 
+  ggplot(aes(x = loc_all, y = value)) +
+  geom_boxplot() +
+  ggtitle('pie_c') +
+  facet_wrap(~species, scales = 'free_x')
+#higher pie_c means that it takes longer to negate labile accumulated chill
+
+par_df %>% 
+  merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
+  filter(species %in% c('Pistachio', 'European Plum') == FALSE,
+         parameter == 'Tf') %>% 
+  mutate(loc_all = gsub('Klein-Altendorf', 'CKA', loc_all),
+         loc_all = recode(loc_all, `Cieza_Zaragoza` = 'Zaragoza_Cieza'),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'Sweet Cherry', 'Almond')),
+         loc_all = factor(loc_all, levels = tmeans$location)) %>% 
+  ggplot(aes(x = loc_all, y = value)) +
+  geom_boxplot() +
+  ggtitle('Tf') +
+  facet_wrap(~species, scales = 'free_x')
+#Tf affects the conversion of labile to stabile chill
+#higher Tf means that the infliction point of the conversion is at higher temperatures
+
+
+
+par_df %>% 
+  merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
+  filter(species %in% c('Pistachio', 'European Plum') == FALSE,
+         parameter == 's1') %>% 
+  mutate(loc_all = gsub('Klein-Altendorf', 'CKA', loc_all),
+         loc_all = recode(loc_all, `Cieza_Zaragoza` = 'Zaragoza_Cieza'),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'Sweet Cherry', 'Almond')),
+         loc_all = factor(loc_all, levels = tmeans$location)) %>% 
+  ggplot(aes(x = loc_all, y = value)) +
+  geom_boxplot() +
+  ggtitle('s1') +
+  facet_wrap(~species, scales = 'free_x')
+
+
+par_df %>% 
+  merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
+  filter(species %in% c('Pistachio', 'European Plum') == FALSE,
+         parameter == 'tau') %>% 
+  mutate(loc_all = gsub('Klein-Altendorf', 'CKA', loc_all),
+         loc_all = recode(loc_all, `Cieza_Zaragoza` = 'Zaragoza_Cieza'),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'Sweet Cherry', 'Almond')),
+         loc_all = factor(loc_all, levels = tmeans$location)) %>% 
+  ggplot(aes(x = loc_all, y = value)) +
+  geom_boxplot() +
+  ggtitle('tau') +
+  facet_wrap(~species, scales = 'free_x')
+
+par_df %>% 
+  merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
+  filter(species %in% c('Pistachio', 'European Plum') == FALSE,
+         parameter == 'theta_c') %>% 
+  mutate(loc_all = gsub('Klein-Altendorf', 'CKA', loc_all),
+         loc_all = recode(loc_all, `Cieza_Zaragoza` = 'Zaragoza_Cieza'),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'Sweet Cherry', 'Almond')),
+         loc_all = factor(loc_all, levels = tmeans$location)) %>% 
+  ggplot(aes(x = loc_all, y = value)) +
+  geom_boxplot() +
+  ggtitle('theta_c') +
+  facet_wrap(~species, scales = 'free_x')
+#more species specific than location specific
+
+par_df %>% 
+  merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
+  filter(species %in% c('Pistachio', 'European Plum') == FALSE,
+         parameter == 'Tb') %>% 
+  mutate(loc_all = gsub('Klein-Altendorf', 'CKA', loc_all),
+         loc_all = recode(loc_all, `Cieza_Zaragoza` = 'Zaragoza_Cieza'),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'Sweet Cherry', 'Almond')),
+         loc_all = factor(loc_all, levels = tmeans$location)) %>% 
+  ggplot(aes(x = loc_all, y = value)) +
+  geom_boxplot() +
+  ggtitle('Tb') +
+  facet_wrap(~species, scales = 'free_x')
+
+par_df %>% 
+  merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
+  filter(species %in% c('Pistachio', 'European Plum') == FALSE,
+         parameter == 'Tu') %>% 
+  mutate(loc_all = gsub('Klein-Altendorf', 'CKA', loc_all),
+         loc_all = recode(loc_all, `Cieza_Zaragoza` = 'Zaragoza_Cieza'),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'Sweet Cherry', 'Almond')),
+         loc_all = factor(loc_all, levels = tmeans$location)) %>% 
+  ggplot(aes(x = loc_all, y = value)) +
+  geom_boxplot() +
+  ggtitle('Tu') +
+  facet_wrap(~species, scales = 'free_x')
+
+par_df %>% 
+  merge(master_fitting_data2, by = c('species', 'cultivar')) %>% 
+  filter(species %in% c('Pistachio', 'European Plum') == FALSE,
+         parameter == 'slope') %>% 
+  mutate(loc_all = gsub('Klein-Altendorf', 'CKA', loc_all),
+         loc_all = recode(loc_all, `Cieza_Zaragoza` = 'Zaragoza_Cieza'),
+         species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'Sweet Cherry', 'Almond')),
+         loc_all = factor(loc_all, levels = tmeans$location)) %>% 
+  ggplot(aes(x = loc_all, y = value)) +
+  geom_boxplot() +
+  ggtitle('slope') +
+  facet_wrap(~species, scales = 'free_x')
+
+
+
+
+
+
+
+sort(c('B', 'A'))
 
 
 
