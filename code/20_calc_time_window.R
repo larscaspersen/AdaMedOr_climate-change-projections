@@ -340,31 +340,56 @@ pheno_future <- read.csv('data/projected_bloomdates_ensemble.csv') %>%
   mutate( pheno_predicted = replace_na(pheno_predicted, val_na))
 
 #read the future weather data
-future_weather_list <- chillR::load_temperature_scenarios('data/future_weather/', prefix = '')
+future_weather_list <- chillR::load_temperature_scenarios('data/future_weather-v2/', prefix = '')
 
 
 #I need bloom windows for each ssp - gcm - time combination
 location_vec <- names(future_weather_list) %>% 
   stringr::str_split('_') %>% 
+  purrr::map_chr(function(x) x[length(x)]) %>% 
+  stringr::str_split('\\.') %>% 
   purrr::map_chr(1)
 
 ssp_vec <- names(future_weather_list) %>% 
   stringr::str_split('_') %>% 
-  purrr::map_chr(2) %>% 
-  stringr::str_split('\\.') %>% 
-  purrr::map_chr(1)
-
-gcm_vec <- names(future_weather_list) %>% 
-  stringr::str_split('_') %>% 
-  purrr::map_chr(2) %>% 
+  purrr::map_chr(function(x) x[length(x)]) %>% 
   stringr::str_split('\\.') %>% 
   purrr::map_chr(2)
 
-time_vec <- names(future_weather_list) %>% 
+gcm_vec <- names(future_weather_list) %>% 
   stringr::str_split('_') %>% 
-  purrr::map_chr(2) %>% 
+  purrr::map_chr(function(x) x[length(x)]) %>% 
   stringr::str_split('\\.') %>% 
   purrr::map_chr(3)
+
+time_vec <- names(future_weather_list) %>% 
+  stringr::str_split('_') %>% 
+  purrr::map_chr(function(x) x[length(x)]) %>% 
+  stringr::str_split('\\.') %>% 
+  purrr::map_chr(4)
+
+windows <- purrr::map(1:length(future_weather_list), function(x){
+  
+  #calculate thermal time window
+  thermal_time_window <- purrr::map(c('begin_flowering_f5', 'flowering_f50'), function(x) LarsChill::get_thermal_window_phenology(weather_list_obs = weather_list_obs, 
+                                                                                                                                  weather_list_pred = future_weather_list[i], 
+                                                                                                                                  observation_df = observation_df, 
+                                                                                                                                  frost_threshold = frost_threshold, 
+                                                                                                                                  heat_threshold = heat_threshold, 
+                                                                                                                                  target_col_obs = x,
+                                                                                                                                  padding = 0.05)) %>% 
+    bind_rows() %>% 
+    mutate(gcm = gcm_vec[i],
+           ssp = ssp_vec[i],
+           location = location_vec[i],
+           scenario_year = time_vec[i],
+           species = tolower(species)) %>% 
+    return()
+  
+}, .progress = TRUE)
+
+do.call(rbind, windows) %>% 
+  write.csv(file = 'data/timewindow_future_v2.csv', row.names = FALSE)
 
 
 future_failure_df <- data.frame()
@@ -420,9 +445,9 @@ for(ssp in unique(ssp_vec)){
     }
   }
 }
-write.csv(future_timewindow_df, file = 'data/timewindow_future.csv', row.names = FALSE)
+write.csv(future_timewindow_df, file = 'data/timewindow_future_v2.csv', row.names = FALSE)
 
-write.csv(future_failure_df, 'data/failure-rate_thermal-risk_future.csv', row.names = FALSE)
+write.csv(future_failure_df, 'data/failure-rate_thermal-risk_future_v2.csv', row.names = FALSE)
 write.csv(failure_df_current, 'data/failure-rate_thermal-risk_current.csv', row.names = FALSE)
 write.csv(failure_df_2020, 'data/failure-rate_thermal-risk_2020-sim.csv', row.names = FALSE)
 

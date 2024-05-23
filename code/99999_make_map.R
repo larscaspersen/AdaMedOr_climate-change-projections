@@ -1,5 +1,5 @@
-install.packages(c("cowplot", "googleway", "ggplot2", "ggrepel", 
-                   "ggspatial", "libwgeom", "sf", "rnaturalearth", "rnaturalearthdata"))
+# install.packages(c("cowplot", "googleway", "ggplot2", "ggrepel", 
+#                    "ggspatial", "libwgeom", "sf", "rnaturalearth", "rnaturalearthdata"))
 
 library("ggplot2")
 theme_set(theme_bw())
@@ -55,16 +55,16 @@ ggplot(data = world) +
              shape = 23, fill = "darkred") +
   geom_label_repel(data = stations, aes(x = longitude, y = latitude, label = station_name),
                   fontface = "bold",
-                  nudge_x = c(-2, -3, -1.5, -1.5, -1.8, 1.5), 
+                  nudge_x = c(-2, -3, -1.5, -1.5, -1.8, 1.5),
                   nudge_y = c(0, 0, 0, 0, 0, 0.05),
                   min.segment.length = 20,
                   fill = "#FFFFFFAA", label.size = NA) +
   # geom_text_repel(data = stations, aes(x = longitude, y = latitude, label = station_name), 
   #                 fontface = "bold", position = position_dodge()) +
-  geom_label_repel(data = stations, aes(x = longitude, y = latitude, label = species), 
-                  nudge_x = c(-2, -3, -1.5, -1.5, -1.8, 1.5), 
-                  udge_y = c(-0.70, -1.1, -0.70, -0.70, -0.70, -0.7), min.segment.length = 20, fill = "#FFFFFFAA", label.size = NA) +
-  oord_sf(xlim = c(-12, 12), ylim = c(28, 54), expand = FALSE) +
+  geom_label_repel(data = stations, aes(x = longitude, y = latitude, label = species),
+                  nudge_x = c(-2, -3, -1.5, -1.5, -1.8, 1.5),
+                  nudge_y = c(-0.70, -1.1, -0.70, -0.70, -0.70, -0.7), min.segment.length = 20, fill = "#FFFFFFAA", label.size = NA) +
+  coord_sf(xlim = c(-12, 12), ylim = c(28, 54), expand = FALSE) +
   xlab('Longitude') +
   ylab('Latitude')+
   annotation_scale(location = "bl", width_hint = 0.4) +
@@ -74,6 +74,48 @@ ggplot(data = world) +
                          pad_x = unit(0.5, "in"), pad_y = unit(0.25, "in"),
                          style = north_arrow_fancy_orienteering)
 ggsave('figures/paper/overview_map.jpeg', height = 15, width = 10, units = 'cm', device = 'jpeg')
+
+
+cm_to_inch <- 1/2.54
+svg(file="figures/paper/map_blank.svg",
+    height = 15 * cm_to_inch,
+    width = 10 * cm_to_inch)
+
+
+ggplot(data = world) +
+  geom_sf() +
+  geom_point(data = stations, aes(x = longitude, y = latitude), size = 3, 
+             shape = 23, fill = "darkred") +
+  # geom_label_repel(data = stations, aes(x = longitude, y = latitude, label = station_name),
+  #                 fontface = "bold",
+  #                 nudge_x = c(-2, -3, -1.5, -1.5, -1.8, 1.5), 
+  #                 nudge_y = c(0, 0, 0, 0, 0, 0.05),
+  #                 min.segment.length = 20,
+  #                 fill = "#FFFFFFAA", label.size = NA) +
+  # geom_text_repel(data = stations, aes(x = longitude, y = latitude, label = station_name), 
+  #                 fontface = "bold", position = position_dodge()) +
+  # geom_label_repel(data = stations, aes(x = longitude, y = latitude, label = species), 
+  #                 nudge_x = c(-2, -3, -1.5, -1.5, -1.8, 1.5), 
+  #                 nudge_y = c(-0.70, -1.1, -0.70, -0.70, -0.70, -0.7), min.segment.length = 20, fill = "#FFFFFFAA", label.size = NA) +
+coord_sf(xlim = c(-12, 12), ylim = c(28, 54), expand = FALSE) +
+  xlab('Longitude') +
+  ylab('Latitude')+
+  annotation_scale(location = "bl", width_hint = 0.4) +
+  annotation_north_arrow(height = unit(1, 'cm'),
+                         width = unit(1, 'cm'),
+                         location = "bl", which_north = "true", 
+                         pad_x = unit(0.5, "in"), pad_y = unit(0.25, "in"),
+                         style = north_arrow_fancy_orienteering)
+
+dev.off()
+
+
+
+
+
+
+
+
 
 
 

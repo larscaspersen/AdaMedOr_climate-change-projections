@@ -78,6 +78,8 @@ par_out <- purrr::map(fit_list_combined, function(spec){
   bind_rows(.id = 'species') %>% 
   pivot_wider(id_cols = c('species', 'repetition', 'cultivar'), names_from = par)
 
+write.csv(par_out, 'data/parameter_cultivars.csv', row.names = FALSE)
+
 
 rownames(par_out) <- paste0(par_out$species, '_', par_out$cultivar, '_', par_out$repetition)
 
@@ -189,9 +191,6 @@ autoplot(pc, data = training, colour = 'species',
          loadings = TRUE, loadings.colour = 'blue',
          loadings.label = TRUE, loadings.label.size = 3)
 
-autoplot(pc, data = training, colour = 'species', 
-         loadings = TRUE, loadings.colour = 'blue',
-         loadings.label = TRUE, loadings.label.size = 3)
 
 df <- cbind(pc$x[,1:2], training[,'species']) %>% as.data.frame()
 df$PC1 <- as.numeric(df$PC1) / (pc$sdev[1] * sqrt(nrow(training)))
@@ -206,8 +205,6 @@ ggplot(df, aes(PC1, PC2, colour = species)) +
   #                                    df$species == "Pear" | 
   #                                    df$species == "Pistachio",]) 
 stat_ellipse(size = 1) 
-
-pc$
 
 #model only knows how to detect pear 
 
@@ -335,4 +332,128 @@ ggsave('figures/cluster_hierachical_species.jpeg', width = 15, height = 10, unit
 
 
 #results for pca cluster
+
+
+
+#maybe the machine learning random forest can find something where the rest failed
+#classes are imbalanced, so how can I make up for it?
+
+#bootstrapping?
+
+par_out <- par_out %>% 
+  mutate(species = recode(species, `Japanese Plum` = 'European Plum')) 
+
+#ive got forty observations for pistachio and european plum
+
+species <- par_out %>% 
+  filter(species %in% c('Pistachio', 'European Plum') == FALSE) %>% 
+  pull(species) %>% 
+  unique()
+#drop european plum and pistachio
+
+n_min <- par_out %>% 
+                 filter(species %in% c('Pistachio', 'European Plum') == FALSE) %>% 
+                 pull(species) %>% 
+                 table() %>% 
+                 min()
+n_train <- n_min * 0.7
+n_val <- n_min * 0.3
+
+
+par_rbalanced <- purrr::map(species, function(spec){
+  #spec <- 'Apple'
+  set.seed(222)
+  sub <- par_out %>% 
+    filter(species == spec)
+  row_i <- sample(1:nrow(sub), size = n_min)
+  return(sub[row_i,])
+}) %>% 
+  bind_rows()
+
+
+set.seed(222)
+par_rbalanced$species <- factor(par_rbalanced$species)
+ind <- sample(2, nrow(par_rbalanced), replace = TRUE, prob = c(0.7, 0.3))
+train <- par_rbalanced[ind==1,]
+test <- par_rbalanced[ind==2,]
+
+
+par_names <- c('yc', 'zc', 's1', 'Tu', 'theta_c', 'tau', 'pie_c', 'Tf', 'Tb', 'slope')
+
+rf <- randomForest::randomForest(species~., data=train[, c('species', par_names)], proximity=TRUE) 
+
+print(rf)
+plot(rf)
+#not high accuracy, maybe some tuning needed
+
+t <- randomForest::tuneRF(as.data.frame(train)[,par_names], as.data.frame(train)[,1],
+            stepFactor = 0.5,
+            plot = TRUE,
+            ntreeTry = 150,
+            trace = TRUE,
+            improve = 0.05)
+
+rf2 <- randomForest::tuneRF(as.data.frame(train)[,par_names], as.data.frame(train)[,1],
+                     stepFactor = 0.5,
+                     plot = TRUE,
+                     ntreeTry = 150,
+                     trace = TRUE,
+                     improve = 0.05,
+                     doBest = TRUE)
+
+hist(randomForest::treesize(rf2),
+     main = "No. of Nodes for the Trees",
+     col = "green")
+
+p1 <- predict(rf2, train)
+caret::confusionMatrix(p1, train$species)
+
+
+randomForest::varImpPlot(rf2,
+                         sort = T,
+                         n.var = 10,
+                         main = "Top 10 - Variable Importance")
+#now yc is even more important
+#difference in swc to estimated chill is most important. so once the seasons get marginal we get higher errors. that makes sense. 
+#that is the whole magic behind it
+#that makes totally sense, but there should be other factors
+
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], yc, "Almond")
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], yc, "Apple")
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], yc, "Pear")
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], yc, "Sweet Cherry")
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], yc, "Apricot")
+
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], pie_c, "Almond")
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], pie_c, "Apple")
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], pie_c, "Pear")
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], pie_c, "Sweet Cherry")
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], pie_c, "Apricot")
+
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], s1, "Almond")
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], s1, "Apple")
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], s1, "Pear")
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], s1, "Sweet Cherry")
+randomForest::partialPlot(rf2, as.data.frame(train)[, c('species', par_names)], s1, "Apricot")
+
+pdp::partial(rf2)
+
+pdp::plotPartial(randomForest::p )
+
+
+randomForest::importance(rf)
+#there is few species specific apart from chill requirement
+#after some long time there is piec, zc and thetac
+#s1 as unspecific as the parameters of the heat model
+#but this could be also just a reflection of the fact, that in single locations we hardly get the 
+#parameters right, especially of the chill model
+
+randomForest::MDSplot(rf, train$species,palette = c('blue', 'green', 'orange', 'yellow', 'firebrick'), pch=as.numeric(train$species))
+#so it is possible to detect the species based on the parameters, but it is difficult to seperate pear and sweet cherries
+
+
+#performance for validation
+p1 <- predict(rf2, test)
+caret::confusionMatrix(p1, test$species)
+
 

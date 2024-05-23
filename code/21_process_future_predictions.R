@@ -42,7 +42,20 @@ pheno_2015 <- read.csv('data/projected_bloomdates_ensemble_historic_scenarios.cs
 #read the validation performance
 performance <- read.csv('data/performance_fitted_models.csv') %>% 
   filter(cultivar %in% cultivar_n, 
-         split == 'Validation')
+         split == 'Validation') %>% 
+  mutate(species = recode(species, `Japanese Plum` = 'European Plum'))
+
+performance %>% 
+  group_by(species) %>% 
+  summarize(med = median(rmse),
+            quan_05 = quantile(rmse, probs = 0.05),
+            quan_95 = quantile(rmse, probs = 0.95))
+
+performance %>% 
+  group_by(species) %>% 
+  summarize(med = median(rpiq_adj),
+            quan_05 = quantile(rpiq_adj, probs = 0.05),
+            quan_95 = quantile(rpiq_adj, probs = 0.95))
 
 
 
@@ -156,7 +169,7 @@ performance <- read.csv('data/performance_fitted_models.csv') %>%
 #   merge(f_test, by = c('spec_cult', 'location', 'gcm', 'ssp', 'scenario_year', 'year_id'))
 # 
 # write.csv(f_out, file = 'data/projected_bloomdates_future.csv', row.names = FALSE)
-
+# 
 f_out <- read.csv('data/projected_bloomdates_future.csv')
 
 #rm(f, f_test, sd, weighted_pred)
@@ -183,13 +196,21 @@ names(f_out)[names(f_out) == "weighted_pred"] <- "pheno_predicted"
 
 
 #make plot to compare projections of local fitted models and "foreign" models
-master_fitting_data <- read.csv('data/master_phenology_repeated_splits.csv') %>% 
-  filter(repetition == 1) %>% 
-  mutate(species = gsub('Japanese Plum', 'European Plum', species)) %>% 
-  group_by(species, cultivar) %>% 
-  summarize(loc = unique(location)) %>% 
+master_fitting_data <- read.csv('data/master_phenology_repeated_splits.csv') %>%
+  filter(repetition == 1) %>%
+  mutate(species = gsub('Japanese Plum', 'European Plum', species)) %>%
+  group_by(species, cultivar) %>%
+  summarize(loc = unique(location)) %>%
   mutate(spec_cult_loc = paste(species, cultivar, loc, sep = '_'),
-         species_location = paste(species, loc, sep = '_'))
+         species_location = paste(species, loc, sep = '_')) %>%
+  filter(cultivar %in% cultivar_n)
+
+master_fitting_data %>%
+  filter(species == 'Almond',
+         cultivar %in% cultivar_n)%>%
+  group_by(cultivar) %>%
+  summarize(n = length(unique(loc))) %>%
+  filter(n == 3)
 
 
 f_out$spec_cult_loc <- paste(f_out$species, f_out$cultivar, f_out$location, sep = '_')
@@ -207,65 +228,123 @@ fail_cult <- f_out[, .(fail_rate = round((sum(fail) / length(fail))*100, digits 
 
 
 
-median_future <- f_out[, .(med_future = median(pheno_predicted, na.rm = TRUE), 
+median_future <- f_out[, .(med_future = median(pheno_predicted, na.rm = TRUE),
                  sd_future = sd(pheno_predicted, na.rm = TRUE)),
                by = .(species, location, ssp, gcm, scenario_year)]
 
 
 #this is for the shift plot
-median_future_local_vs_foreign <- f_out[, .(med_future = median(pheno_predicted, na.rm = TRUE), 
+median_future_local_vs_foreign <- f_out[, .(med_future = median(pheno_predicted, na.rm = TRUE),
                            sd_future = sd(pheno_predicted, na.rm = TRUE)),
                        by = .(species, location, ssp, gcm, scenario_year, local_cultivar)]
 
 
 #this is needed for the point +- sd plot
-median_future_local_vs_foreign_allgcm <- f_out[, .(med_future = median(pheno_predicted, na.rm = TRUE), 
+median_future_local_vs_foreign_allgcm <- f_out[, .(med_future = median(pheno_predicted, na.rm = TRUE),
                                             sd_future = sd(pheno_predicted, na.rm = TRUE)),
                                         by = .(species, location, ssp, scenario_year, local_cultivar)]
 
 rm(f_out)
 gc()
 
-pheno_2015 %>% 
-  grou
+fail_cult %>%
+  filter(species == 'Apricot', location == 'Cieza') %>%
+  ggplot(aes(x = cultivar, y = fail_rate, fill = ssp)) +
+  geom_boxplot() +
+  facet_grid(local_cultivar~scenario_year)
+
+t <- fail_cult %>%
+  filter(species == 'Apricot', location == 'Cieza') %>%
+  group_by(cultivar, local_cultivar, ssp, scenario_year) %>%
+  summarise(med_fail = median(fail_rate)) %>%
+  filter(local_cultivar)
+
+fail_cult %>%
+  filter(species == 'Pistachio', location == 'Sfax') %>%
+  ggplot(aes(x = cultivar, y = fail_rate, fill = ssp)) +
+  geom_boxplot() +
+  facet_grid(local_cultivar~scenario_year)
+
+loc_almond_cult <- c('Abiodh Ras Djebel', 'Faggoussi', 'Garnghzel',
+              'Tozeur 4', 'Fakhfekh', 'Khoukhi', 'Tozeur 1',
+              'Achak', 'Ksontini', 'Zahaf', 'Abiodh de Sfax',
+              'Tozeur 2', 'Achaak')
+for_almond_cult <- c('Tarragona', 'Cristomorto', 'Nonpareil',
+                     'Pizzuta', 'Genco Taronto', 'Fournat de Breznaud',
+                     'Soukaret', 'Trell', 'Bonifacio', 'Mazzetto',
+                     'Ferraduel', 'Ferragnes', 'Ne Plus Ultra', 'Avola',
+                     'Tuono Taronto', 'Rechelle Taronto', 'Doree',
+                     'Bruantine', 'Cavaliera', 'Fasciuneddu',
+                     'Ramlet R249', 'Montrone', 'Languedoc',
+                     'Malaguena', 'Ramlet R250', 'Dorée')
+
+fail_cult %>%
+  filter(species == 'Almond', location == 'Sfax') %>%
+  ggplot(aes(x = cultivar, y = fail_rate, fill = ssp)) +
+  geom_boxplot() +
+  facet_grid(local_cultivar~scenario_year)
+
+fail_cult %>%
+  filter(species == 'Almond', location == 'Sfax') %>%
+  mutate(loc_almond = ifelse(cultivar %in% loc_almond_cult,
+                             yes = TRUE,
+                             no = ifelse(cultivar %in% for_almond_cult, yes = FALSE, no = NA))) %>%
+  filter(scenario_year == 2050, local_cultivar == TRUE) %>%
+  ggplot(aes(x = cultivar, y = fail_rate, fill = ssp)) +
+  geom_boxplot() +
+  facet_grid(ssp~loc_almond, scales = 'free_x')
+
+fail_cult %>%
+  filter(species == 'Almond', location == 'Sfax') %>%
+  mutate(loc_almond = ifelse(cultivar %in% loc_almond_cult,
+                             yes = TRUE,
+                             no = ifelse(cultivar %in% for_almond_cult, yes = FALSE, no = NA))) %>%
+  filter(scenario_year == 2085, local_cultivar == TRUE) %>%
+  ggplot(aes(x = cultivar, y = fail_rate, fill = ssp)) +
+  geom_boxplot() +
+  facet_grid(ssp~loc_almond, scales = 'free_x')
 
 
-t <- pheno_2015 %>% 
-  mutate(fail = is.na(pheno_predicted)) %>% 
-  group_by(species, cultivar, location) %>% 
-  summarize(fail_rate = (sum(fail) / n())*100) %>% 
+
+
+
+
+t <- pheno_2015 %>%
+  mutate(fail = is.na(pheno_predicted)) %>%
+  group_by(species, cultivar, location) %>%
+  summarize(fail_rate = (sum(fail) / n())*100) %>%
   filter(location == 'Zaragoza', species == 'Sweet Cherry')
 
-pheno_2015 %>% 
-  group_by(species, cultivar, location) %>% 
+pheno_2015 %>%
+  group_by(species, cultivar, location) %>%
   mutate(fail_rate = (sum(is.na(pheno_predicted)) / n())*100,
          ssp = '2015',
-         scenario_year = 2015) %>% 
-  rbind(fail_cult) %>% 
-  filter(location == 'Meknes', species == 'Apple') %>% 
-  ggplot(aes(x = cultivar, y = fail_rate, fill = ssp)) + 
+         scenario_year = 2015) %>%
+  rbind(fail_cult) %>%
+  filter(location == 'Meknes', species == 'Apple') %>%
+  ggplot(aes(x = cultivar, y = fail_rate, fill = ssp)) +
   geom_boxplot() +
   facet_grid(~scenario_year)
 
-pheno_2015 %>% 
-  group_by(species, cultivar, location) %>% 
+pheno_2015 %>%
+  group_by(species, cultivar, location) %>%
   mutate(fail_rate = (sum(is.na(pheno_predicted)) / n())*100,
          ssp = '2015',
-         scenario_year = 2015) %>% 
-  rbind(fail_cult) %>% 
-  filter(location == 'Cieza', species == 'Apricot') %>% 
-  ggplot(aes(x = cultivar, y = fail_rate, fill = ssp)) + 
+         scenario_year = 2015) %>%
+  rbind(fail_cult) %>%
+  filter(location == 'Cieza', species == 'Apricot') %>%
+  ggplot(aes(x = cultivar, y = fail_rate, fill = ssp)) +
   geom_boxplot() +
   facet_grid(~scenario_year)
 
-pheno_2015 %>% 
-  group_by(species, cultivar, location) %>% 
+pheno_2015 %>%
+  group_by(species, cultivar, location) %>%
   mutate(fail_rate = (sum(is.na(pheno_predicted)) / n())*100,
          ssp = '2015',
-         scenario_year = 2015) %>% 
-  rbind(fail_cult) %>% 
-  filter(location == 'Zaragoza', species == 'Sweet Cherry') %>% 
-  ggplot(aes(x = cultivar, y = fail_rate, fill = ssp)) + 
+         scenario_year = 2015) %>%
+  rbind(fail_cult) %>%
+  filter(location == 'Zaragoza', species == 'Sweet Cherry') %>%
+  ggplot(aes(x = cultivar, y = fail_rate, fill = ssp)) +
   geom_boxplot() +
   facet_grid(~scenario_year)
 
@@ -274,28 +353,33 @@ pheno_2015 %>%
 
 
 #calculate median for both
-median_2015 <- pheno_2015 %>% 
-  group_by(species, location) %>% 
+median_2015 <- pheno_2015 %>%
+  group_by(species, location) %>%
   summarise(med_current = median(pheno_predicted, na.rm = TRUE),
             sd_current = sd(pheno_predicted, na.rm = TRUE))
 
-median_2015_locfor <- pheno_2015 %>% 
+median_2015_locfor <- pheno_2015 %>%
   mutate(spec_cult_loc = paste(species, cultivar, location, sep = '_'),
-         local_cultivar = ifelse(spec_cult_loc %in% master_fitting_data$spec_cult_loc, yes = TRUE, no = FALSE)) %>% 
-  group_by(species, location, local_cultivar) %>% 
+         local_cultivar = ifelse(spec_cult_loc %in% master_fitting_data$spec_cult_loc, yes = TRUE, no = FALSE)) %>%
+  group_by(species, location, local_cultivar) %>%
   summarise(med_current = median(pheno_predicted, na.rm = TRUE),
             sd_current = sd(pheno_predicted, na.rm = TRUE))
 
 
-shift_df <- merge(median_2015, median_future, by = c('species','location')) %>% 
+shift_df <- merge(median_2015, median_future, by = c('species','location')) %>%
   mutate(shift_bloom = round(med_future - med_current, digits = 2))
 
-shift_table <- shift_df %>% 
-  group_by(species, location, scenario_year, ssp) %>% 
+shift_table <- shift_df %>%
+  group_by(species, location, scenario_year, ssp) %>%
   summarise(min_shift = min(shift_bloom, na.rm = TRUE),
             max_shift = max(shift_bloom, na.rm = TRUE))
+# 
+# write.csv(shift_table, 'data/summary_shift_bloom_date_text_v2.csv', row.names = FALSE)
+# write.csv(shift_df, 'data/summary_shift_bloom_date_text_v2_inidvidual-gcm.csv', row.names = FALSE)
 
-write.csv(shift_table, 'data/summary_shift_bloom_date_text_v2.csv', row.names = FALSE)
+shift_table <- read.csv('data/summary_shift_bloom_date_text_v2.csv')
+shift_df <- read.csv('data/summary_shift_bloom_date_text_v2_inidvidual-gcm.csv')
+
 
 
 #merge the two
@@ -437,6 +521,39 @@ shift_table <- shift_df_locfor %>%
   summarise(min_shift = min(shift_bloom, na.rm = TRUE),
             max_shift = max(shift_bloom, na.rm = TRUE))
 
+shift_table %>% 
+  ggplot(aes(x = local_cultivar, y= med_shift)) +
+  geom_boxplot() +
+  facet_grid(species ~ location)
+
+shift_df_locfor %>% 
+  mutate(dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2),
+         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         spec = as.numeric(factor(species, levels = c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'))),
+         loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))),
+         species_location = factor(paste(species, location, sep = '_'), levels = c("Apple_Klein-Altendorf",
+                                                                                   "Apple_Meknes",
+                                                                                   "Pear_Klein-Altendorf",
+                                                                                   "Pear_Zaragoza",
+                                                                                   "Apricot_Zaragoza",
+                                                                                   "Apricot_Cieza",
+                                                                                   "European Plum_Klein-Altendorf",
+                                                                                   "Sweet Cherry_Klein-Altendorf",
+                                                                                   "Sweet Cherry_Zaragoza",
+                                                                                   "Almond_Santomera",
+                                                                                   "Almond_Meknes",
+                                                                                   "Almond_Sfax",
+                                                                                   "Pistachio_Sfax")),
+         spec_loc = as.numeric(species_location),
+         species = factor(species, levels =  c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio')),
+         local_cultivar = factor(local_cultivar, levels = c(TRUE, FALSE), labels = c('local calibration', 'projected')),
+         med_future = ifelse(is.na(med_current), yes = NA, no = med_future)) %>% 
+  drop_na() %>% 
+  ggplot(aes(x = local_cultivar, y= shift_bloom, fill = location)) +
+  geom_boxplot() 
+    
+
 shift_df_locfor %>% 
   mutate(dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
          dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2),
@@ -510,8 +627,8 @@ fail_plot <- fail_summarized %>%
          median_fail_text = round(median_fail, digits = 0),
          #median_fail_text = ifelse(median_fail < 10, yes = paste0(' ', median_fail_text), no = median_fail_text),
          median_fail_text = ifelse(median_fail < 1 & median_fail > 0, yes = '<1', no = median_fail_text),
-         median_fail_text = ifelse(median_fail < 100 & median_fail > 99, yes = '>99', no = median_fail_text),
-         median_fail_text = paste0(median_fail_text, ' %')) %>% 
+         median_fail_text = ifelse(median_fail < 100 & median_fail > 99, yes = '>99', no = median_fail_text)) %>%
+  #mutate(median_fail_text = paste0(median_fail_text, ' %')) %>% 
   drop_na() 
 
 #decides where to start the heatmap
@@ -614,6 +731,300 @@ shift_df_locfor %>%
   xlab('Median Predicted Bloom Date')
 ggplot2::ggsave('figures/paper/change_med_bloom_2050_loc-vs-for_v4_updated_gcms.jpeg', device = 'jpeg',
                 height = 42, width = 31, units = 'cm')
+
+
+
+
+fail_plot <- fail_plot %>% 
+  mutate(species = factor(species, levels = c('Apple', 'Pear', 'Apricot', 'Europ. Plum', 'Sweet Cherry', 'Almond', 'Pistachio'),
+                          labels = c('Apple', 'Pear', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Almond', 'Pist.')))
+
+#data.frame controlling the positioning of the "No Pred." label in the plot
+df_text_no_pred <- data.frame(y =  rep(c(0.45,2.45, 4.45, 6.45, 7.45, 9.475, 12.45), 2),
+                              x = x_cutoff + 1,
+                              species = factor(rep(c('Apple', 'Pear', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Almond', 'Pist.'), 2),
+                                               levels =  c('Apple', 'Pear', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Almond', 'Pist.')),
+                              local_cultivar = factor(rep(c('Local calibration', 'Projected'), each = 7), levels = c('Local calibration', 'Projected')))
+
+df_padding_box <- data.frame(y = rep(c(6.4, 12.4), 2),
+                             x = x_cutoff +1,
+                             species = factor(rep(c('E. Plum', 'Pist.'), 2),
+                                              levels =  c('Apple', 'Pear', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Almond', 'Pist.')),
+                             local_cultivar = factor(rep(c('Local calibration', 'Projected'), each = 2), levels = c('Local calibration', 'Projected')))
+
+df_padding_box$species
+
+
+#data.frame to control the grey box background of the heatmap
+grey_box_df <- data.frame(spec_loc = NA,
+                          start = 152,
+                          end = Inf,
+                          sepecies = factor(rep(c('Apple', 'Apple',  'Pear',  'Pear', 'Apricot', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Sweet Cherry', rep('Almond', 3), 'Pist.'), 2),
+                                            levels =  c('Apple', 'Pear', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Almond', 'Pist.')),
+                          local_cultivar = factor(rep(c('Local calibration', 'Projected'), each = 13), levels = c('Local calibration', 'Projected')))
+
+box_size <-  4
+
+p <- shift_df_locfor %>% 
+  mutate(dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2),
+         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         spec = as.numeric(factor(species, levels = c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'))),
+         loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))),
+         species_location = factor(paste(species, location, sep = '_'), levels = c("Apple_Klein-Altendorf",
+                                                                                   "Apple_Meknes",
+                                                                                   "Pear_Klein-Altendorf",
+                                                                                   "Pear_Zaragoza",
+                                                                                   "Apricot_Zaragoza",
+                                                                                   "Apricot_Cieza",
+                                                                                   "European Plum_Klein-Altendorf",
+                                                                                   "Sweet Cherry_Klein-Altendorf",
+                                                                                   "Sweet Cherry_Zaragoza",
+                                                                                   "Almond_Santomera",
+                                                                                   "Almond_Meknes",
+                                                                                   "Almond_Sfax",
+                                                                                   "Pistachio_Sfax")),
+         ssp_label = factor(ssp, levels = c('ssp126', 'ssp245', 'ssp370', 'ssp585'), labels = c('SSP1', 'SSP2', 'SSP3', 'SSP5')),
+         spec_loc = as.numeric(species_location),
+         species = factor(species, levels =  c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'),
+                          labels = c('Apple', 'Pear', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Almond', 'Pist.')),
+         local_cultivar = factor(local_cultivar, levels = c(TRUE, FALSE), labels = c('Local calibration', 'Projected')),
+         med_future = ifelse(is.na(med_current), yes = NA, no = med_future)) %>% 
+  drop_na() %>% 
+  filter(scenario_year == as.character(year_used)) %>% 
+  ggplot(ggplot2::aes(y = spec_loc)) +
+  geom_rect(aes(xmin = med_current, xmax = med_future, ymin = spec_loc + dodge_low, ymax = spec_loc + dodge_up, fill = ssp_label), alpha = 0.2) +
+  # geom_point(aes(x = med_future, y = spec_loc + ((dodge_low + dodge_up)/2), 
+  #                shape = 'Median prediction\nof individual GCMs'),
+  #            col = 'grey20',
+  #            show.legend = TRUE, size = 0.7) + 
+  geom_rect(aes(xmin = med_current - 0.5, xmax = med_current + 0.5, ymax = spec_loc - 0.4, ymin = spec_loc + 0.4, fill = 'Simulation 2015'),  size = 2) +
+  geom_rect(data = grey_box_df, xmin = x_cutoff, xmax = Inf,ymax = Inf, ymin = -Inf, fill = 'grey85',  size = 2) +
+  geom_point(data = fail_plot[fail_plot$scenario_year == year_used], aes(x=x_cutoff+4.5, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail), shape=15, size=box_size) +
+  geom_point(data = fail_plot[fail_plot$scenario_year == year_used], aes(x=x_cutoff+5, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail), shape=15, size=box_size) +
+  geom_point(data = fail_plot[fail_plot$scenario_year == year_used], aes(x=x_cutoff+7, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail), shape=15, size=box_size) +
+  geom_point(data = fail_plot[fail_plot$scenario_year == year_used], aes(x=x_cutoff+9, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail), shape=15, size=box_size) +
+  geom_point(data = fail_plot[fail_plot$scenario_year == year_used], aes(x=x_cutoff+11, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail), shape=15, size=box_size) +
+  geom_point(data = fail_plot[fail_plot$scenario_year == year_used], aes(x=x_cutoff+13, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail), shape=15, size=box_size) +
+  geom_point(data = fail_plot[fail_plot$scenario_year == year_used], aes(x=x_cutoff+15, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail), shape=15, size=box_size) +
+  scale_colour_gradient(low = "white", high = "firebrick2", limits = c(0, 100),name = 'Median Failure Rate') +
+  geom_vline(xintercept = x_cutoff) +
+  geom_point(data = df_padding_box, aes(y = y, x = x), col = 'grey85', size = 0.1) +
+  geom_text(data = df_text_no_pred, aes(y = y, x = x,
+                                        label = 'Fail'),hjust = 0, size = 2.5) +
+  # geom_text(data = fail_plot[fail_plot$scenario_year == year_used],aes(x = 155 + 2, y = spec_loc  + ((dodge_low + dodge_up)/2), 
+  #               label = paste(format(round(median_fail, digits = 0), nsmall = 0), '%')), size = 3) +
+  geom_text(data = fail_plot[fail_plot$scenario_year == year_used],aes(x = x_cutoff + (heat_map_width * 1.5), y = spec_loc  + ((dodge_low + dodge_up)/2),
+                                                                       label = median_fail_text), size = 2.5, hjust = 1) +
+  facet_grid(species~local_cultivar, scales = 'free_y', space = 'free_y') +
+  #scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(breaks = c('SSP1', 'SSP2',  'Simulation 2015', 'SSP3', 'SSP5'),  
+                    values = c("#56B4E9", "#009E73",'black',"#F0E442",  "#E69F00", 'grey70'), name = "Weather Scenario")+
+  #scale_shape_manual(values = 4, name = NULL) + 
+  theme_bw(base_size = 12) +
+  scale_x_continuous(breaks = c(32,  60, 91, 121, 152), 
+                     labels = c('Feb', 'Mar', 'Apr', 'May', 'Jun'),
+                     minor_breaks = c(1, 32, 60, 91, 121, 152)) +
+  scale_y_reverse(breaks = 1:13, labels = c('Klein-Altendorf', 'Meknes', 'Klein-Altendorf', 'Zaragoza', 'Zaragoza', 'Cieza', 'Klein-Altendorf', 'Klein-Altendorf', 'Zaragoza', 'Santomera', 'Meknes', 'Sfax', 'Sfax'),
+                  minor_breaks = NULL) +
+  coord_cartesian(xlim = c(32, x_cutoff + heat_map_width)) +
+  guides( fill=guide_legend(nrow=2,byrow=TRUE, order = 1)) +
+  theme(legend.position = 'bottom') +
+  ylab('') +
+  xlab('Median Predicted Bloom Date')
+
+jpeg(file="figures/paper/legend_shift.jpeg", width = 25, height = 5, units = 'cm', res = 200)
+leg <- cowplot::get_legend(p)
+grid::grid.newpage()
+grid::grid.draw(leg)
+dev.off()
+
+p+
+  theme(legend.position = "none")
+ggplot2::ggsave('figures/paper/change_med_bloom_2050_loc-vs-for_v4_updated_gcms_resized.jpeg', device = 'jpeg',
+                height = 20, width = 16, units = 'cm')
+
+
+
+#data.frame controlling the positioning of the "No Pred." label in the plot
+df_text_no_pred <- data.frame(y =  rep(c(0.45,2.45, 4.45, 6.45, 7.45, 9.46, 12.45), 2),
+                              x = x_cutoff + 2.5,
+                              species = factor(rep(c('Apple', 'Pear', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Almond', 'Pist.'), 2),
+                                               levels =  c('Apple', 'Pear', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Almond', 'Pist.')),
+                              local_cultivar = factor(rep(c('Local calibration', 'Projected'), each = 7), levels = c('Local calibration', 'Projected')),
+                              scenario_year = rep(c(2050, 2085), each = 7))
+
+df_padding_box <- data.frame(y = rep(c(6.4, 12.4), 2),
+                             x = x_cutoff +1,
+                             species = factor(rep(c('E. Plum', 'Pist.'), 2),
+                                              levels =  c('Apple', 'Pear', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Almond', 'Pist.')),
+                             local_cultivar = factor(rep(c('Local calibration', 'Projected'), each = 2), levels = c('Local calibration', 'Projected')),
+                             scenario_year = rep(c(2050, 2085), each = 2))
+
+df_padding_box$species
+
+
+#data.frame to control the grey box background of the heatmap
+grey_box_df <- data.frame(spec_loc = NA,
+                          start = 152,
+                          end = Inf,
+                          sepecies = factor(rep(c('Apple', 'Apple',  'Pear',  'Pear', 'Apricot', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Sweet Cherry', rep('Almond', 3), 'Pist.'), 2),
+                                            levels =  c('Apple', 'Pear', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Almond', 'Pist.')),
+                          local_cultivar = factor(rep(c('Local calibration', 'Projected'), each = 13), levels = c('Local calibration', 'Projected')),
+                          scenario_year = rep(c(2050, 2085), each = 13))
+
+library(colorRamps)
+
+box_size <-  3
+
+p <- shift_df_locfor %>% 
+  mutate(dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2),
+         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         spec = as.numeric(factor(species, levels = c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'))),
+         loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))),
+         species_location = factor(paste(species, location, sep = '_'), levels = c("Apple_Klein-Altendorf",
+                                                                                   "Apple_Meknes",
+                                                                                   "Pear_Klein-Altendorf",
+                                                                                   "Pear_Zaragoza",
+                                                                                   "Apricot_Zaragoza",
+                                                                                   "Apricot_Cieza",
+                                                                                   "European Plum_Klein-Altendorf",
+                                                                                   "Sweet Cherry_Klein-Altendorf",
+                                                                                   "Sweet Cherry_Zaragoza",
+                                                                                   "Almond_Santomera",
+                                                                                   "Almond_Meknes",
+                                                                                   "Almond_Sfax",
+                                                                                   "Pistachio_Sfax")),
+         ssp_label = factor(ssp, levels = c('ssp126', 'ssp245', 'ssp370', 'ssp585'), labels = c('SSP1', 'SSP2', 'SSP3', 'SSP5')),
+         spec_loc = as.numeric(species_location),
+         species = factor(species, levels =  c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'),
+                          labels = c('Apple', 'Pear', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Almond', 'Pist.')),
+         local_cultivar = factor(local_cultivar, levels = c(TRUE, FALSE), labels = c('Local calibration', 'Projected')),
+         med_future = ifelse(is.na(med_current), yes = NA, no = med_future)) %>% 
+  drop_na() %>% 
+  filter(local_cultivar == 'Local calibration') %>% 
+  ggplot(ggplot2::aes(y = spec_loc)) +
+  geom_rect(aes(xmin = med_current, xmax = med_future, ymin = spec_loc + dodge_low, ymax = spec_loc + dodge_up, fill = ssp_label), alpha = 0.2) +
+  # geom_point(aes(x = med_future, y = spec_loc + ((dodge_low + dodge_up)/2), 
+  #                shape = 'Median prediction\nof individual GCMs'),
+  #            col = 'grey20',
+  #            show.legend = TRUE, size = 0.7) + 
+  geom_rect(aes(xmin = med_current - 0.5, xmax = med_current + 0.5, ymax = spec_loc - 0.4, ymin = spec_loc + 0.4, fill = 'Simulation 2015'),  size = 2) +
+  geom_rect(data = grey_box_df, xmin = x_cutoff, xmax = Inf,ymax = Inf, ymin = -Inf, fill = 'grey85',  size = 2) +
+  geom_point(data = fail_plot[fail_plot$local_cultivar == 'Local calibration'], aes(x=x_cutoff+3.7, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail/100), shape=15, size=box_size) +
+  geom_point(data = fail_plot[fail_plot$local_cultivar == 'Local calibration'], aes(x=x_cutoff+4.5, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail/100), shape=15, size=box_size) +
+  geom_point(data = fail_plot[fail_plot$local_cultivar == 'Local calibration'], aes(x=x_cutoff+5, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail/100), shape=15, size=box_size) +
+  geom_point(data = fail_plot[fail_plot$local_cultivar == 'Local calibration'], aes(x=x_cutoff+7, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail/100), shape=15, size=box_size) +
+  geom_point(data = fail_plot[fail_plot$local_cultivar == 'Local calibration'], aes(x=x_cutoff+9, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail/100), shape=15, size=box_size) +
+  geom_point(data = fail_plot[fail_plot$local_cultivar == 'Local calibration'], aes(x=x_cutoff+11, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail/100), shape=15, size=box_size) +
+  geom_point(data = fail_plot[fail_plot$local_cultivar == 'Local calibration'], aes(x=x_cutoff+13, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail/100), shape=15, size=box_size) +
+  geom_point(data = fail_plot[fail_plot$local_cultivar == 'Local calibration'], aes(x=x_cutoff+15, y= spec_loc + ((dodge_low + dodge_up)/2), color=median_fail/100), shape=15, size=box_size) +
+  #scale_colour_gradient(low = "white", high = "firebrick2", limits = c(0, 100),name = 'Median Failure Rate', labels = scales::percent) +
+  scale_color_gradientn(colours = matlab.like(15),
+                       labels = scales::percent,
+                       limits = c(0, 1),
+                       name = paste0('Median Failure Rate'))+
+  geom_vline(xintercept = x_cutoff) +
+  geom_point(data = df_padding_box, aes(y = y, x = x), col = 'grey85', size = 0.1) +
+  geom_text(data = df_text_no_pred, aes(y = y, x = x,
+                                        label = 'Fail'),hjust = 0, size = 2.5) +
+  # geom_text(data = fail_plot[fail_plot$scenario_year == year_used],aes(x = 155 + 2, y = spec_loc  + ((dodge_low + dodge_up)/2), 
+  #               label = paste(format(round(median_fail, digits = 0), nsmall = 0), '%')), size = 3) +
+  geom_text(data = fail_plot[fail_plot$local_cultivar == 'Local calibration'],aes(x = x_cutoff + (heat_map_width * 1.1), y = spec_loc  + ((dodge_low + dodge_up)/2),
+                                                                       label = median_fail_text), size = 2.5, hjust = 1) +
+  facet_grid(species~scenario_year, scales = 'free_y', space = 'free_y') +
+  #scale_color_manual(values = c("#56B4E9", "#009E73","#F0E442",  "#E69F00"))+
+  scale_fill_manual(breaks = c('SSP1', 'SSP2',  'Simulation 2015', 'SSP3', 'SSP5'),  
+                    values = c("#56B4E9", "#009E73",'black',"#F0E442",  "#E69F00", 'grey70'), name = "Weather Scenario")+
+  #scale_shape_manual(values = 4, name = NULL) + 
+  theme_bw(base_size = 12) +
+  scale_x_continuous(breaks = c(32,  60, 91, 121, 152), 
+                     labels = c('Feb', 'Mar', 'Apr', 'May', 'Jun'),
+                     minor_breaks = c(1, 32, 60, 91, 121, 152)) +
+  scale_y_reverse(breaks = 1:13, labels = c('Klein-Altendorf', 'Meknes', 'Klein-Altendorf', 'Zaragoza', 'Zaragoza', 'Cieza', 'Klein-Altendorf', 'Klein-Altendorf', 'Zaragoza', 'Santomera', 'Meknes', 'Sfax', 'Sfax'),
+                  minor_breaks = NULL) +
+  coord_cartesian(xlim = c(32, x_cutoff + heat_map_width)) +
+  guides( fill=guide_legend(nrow=2,byrow=TRUE, order = 1)) +
+  theme(legend.position = 'bottom') +
+  ylab('') +
+  xlab('Median Predicted Bloom Date')
+
+jpeg(file="figures/paper/legend_shift.jpeg", width = 25, height = 5, units = 'cm', res = 200)
+leg <- cowplot::get_legend(p)
+grid::grid.newpage()
+grid::grid.draw(leg)
+dev.off()
+
+p+
+  theme(legend.position = "none")
+ggplot2::ggsave('figures/paper/change_med_bloom_2050_loc-vs-for_v4_updated_gcms_only-local.jpeg', device = 'jpeg',
+                height = 20, width = 16, units = 'cm')
+
+
+cm_to_inch <- 1/2.54
+svg('figures/paper/change_med_bloom_only_loc.svg', width = 16 * cm_to_inch, height = 20*cm_to_inch)
+p+
+  theme(legend.position = "none")
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+df_shift <- shift_df_locfor %>% 
+  mutate(dodge_up = recode(ssp, ssp126 = -0.2, ssp245 = 0, ssp370 = 0.2, ssp585 = 0.4),
+         dodge_low = recode(ssp, ssp126 = -0.4, ssp245 = -0.2, ssp370 = 0, ssp585 = 0.2),
+         location = factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax')),
+         spec = as.numeric(factor(species, levels = c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'))),
+         loc = as.numeric(factor(location, levels = c('Klein-Altendorf', 'Zaragoza', 'Cieza', 'Santomera', 'Meknes', 'Sfax'))),
+         species_location = factor(paste(species, location, sep = '_'), levels = c("Apple_Klein-Altendorf",
+                                                                                   "Apple_Meknes",
+                                                                                   "Pear_Klein-Altendorf",
+                                                                                   "Pear_Zaragoza",
+                                                                                   "Apricot_Zaragoza",
+                                                                                   "Apricot_Cieza",
+                                                                                   "European Plum_Klein-Altendorf",
+                                                                                   "Sweet Cherry_Klein-Altendorf",
+                                                                                   "Sweet Cherry_Zaragoza",
+                                                                                   "Almond_Santomera",
+                                                                                   "Almond_Meknes",
+                                                                                   "Almond_Sfax",
+                                                                                   "Pistachio_Sfax")),
+         ssp_label = factor(ssp, levels = c('ssp126', 'ssp245', 'ssp370', 'ssp585'), labels = c('SSP1', 'SSP2', 'SSP3', 'SSP5')),
+         spec_loc = as.numeric(species_location),
+         species = factor(species, levels =  c('Apple', 'Pear', 'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'),
+                          labels = c('Apple', 'Pear', 'Apricot', 'E. Plum', 'Sweet Cherry', 'Almond', 'Pist.')),
+         local_cultivar = factor(local_cultivar, levels = c(TRUE, FALSE), labels = c('Local calibration', 'Projected')),
+         med_future = ifelse(is.na(med_current), yes = NA, no = med_future)) %>% 
+  drop_na() %>% 
+  filter(local_cultivar == 'Local calibration') %>% 
+  group_by(species, location, scenario_year, ssp) %>% 
+  summarize(med_shift = median(med_current - med_future))
+
+
+
+
+
+
 
 
 
@@ -1064,6 +1475,8 @@ ggsave('figures/paper/local_foreign_median_sd_allyears.jpeg', height = 30, width
 
 
 
-
+performance %>% 
+  group_by(species) %>% 
+  summarize(med_rmse = median(rmse))
 
 

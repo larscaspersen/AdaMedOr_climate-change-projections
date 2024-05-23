@@ -214,7 +214,8 @@ p1 <- performance %>%
   filter(split == 'Validation') %>% 
   mutate(species = factor(species, levels =c('Apple','Pear',  'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'))) %>% 
   ggplot(aes(y = species, x = rmse)) +
-  geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  #geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  geom_boxplot(show.legend = FALSE, fill = 'grey70')+
   scale_y_discrete(limits = rev)+
   ylab('') +
   xlab('Root Mean Square Error (RMSE)\nfor Validation Data') + 
@@ -229,7 +230,8 @@ p2 <- performance %>%
   filter(split == 'Validation') %>% 
   mutate(species = factor(species, levels = c('Apple','Pear',  'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'))) %>% 
   ggplot(aes(y = species, x = rpiq_adj)) +
-  geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  #geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  geom_boxplot(show.legend = FALSE, fill = 'grey70')+
   scale_y_discrete(limits = rev)+
   ylab('') +
   xlab('Ratio of Performance to Interquartile\nDistance (RPIQ) for Validation Data') + 
@@ -248,6 +250,194 @@ p1 + p2 + plot_layout(guides = 'collect') &
   
 ggsave('figures/paper/performance_sum.jpeg', device = 'jpeg',
        height = 15, width = 25, units = 'cm')
+
+
+#check link to temperature
+
+master_adamedor <- read.csv('data/master_phenology_repeated_splits.csv') %>% 
+  filter(repetition == 1) %>% 
+  mutate(species = recode(species, `Japanese plum` = 'European plum')) %>% 
+  mutate(temp = recode(location, 
+                       `Klein-Altendorf` = 5.8,
+                       Zaragoza = 10.1,
+                       Santomera = 13.2,
+                       Meknes = 11.6,
+                       Cieza = 10.8, 
+                       Sfax = 14.7)) %>% 
+  group_by(species, cultivar) %>% 
+  summarize(max_temp = max(temp))
+
+p3 <- performance %>% 
+  filter(split == 'Validation') %>% 
+  merge(master_adamedor, by = c('species', 'cultivar')) %>% 
+  mutate(species = factor(species, levels =c('Apple','Pear',  'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'))) %>% 
+  ggplot(aes(y = max_temp, x = rmse, group = max_temp)) +
+  #geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  geom_boxplot(show.legend = FALSE, fill = 'grey70')+
+  ylab('') +
+  xlab('Root Mean Square Error (RMSE)\nfor Validation Data') + 
+  scale_fill_manual(values = col2) +
+  #geom_vline(xintercept = 1, linetype = 'dashed') +
+  #  ggsci::scale_fill_tron()+
+  #  scale_fill_manual(values = viridis::viridis(8))+
+  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
+  theme_bw(base_size = 15)
+
+p4 <- performance %>% 
+  filter(split == 'Validation') %>% 
+  merge(master_adamedor, by = c('species', 'cultivar')) %>% 
+  mutate(species = factor(species, levels =c('Apple','Pear',  'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'))) %>% 
+  ggplot(aes(y = max_temp, x = rpiq_adj, group = max_temp)) +
+  #geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  geom_boxplot(show.legend = FALSE, fill = 'grey70')+
+  ylab('') +
+  geom_vline(xintercept = 1, linetype = 'dashed') +
+  xlab('Ratio of Performance to Interquartile\nDistance (RPIQ) for Validation Data') + 
+  scale_fill_manual(values = col2) +
+  #geom_vline(xintercept = 1, linetype = 'dashed') +
+  #  ggsci::scale_fill_tron()+
+  #  scale_fill_manual(values = viridis::viridis(8))+
+  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
+  theme_bw(base_size = 15)+
+  theme(axis.ticks.y = element_blank(),
+        axis.text.y = element_blank())
+
+p1_mod <- p1 + xlab('') + ylab('Modelled Species') + theme(plot.margin = unit(c(0,0.5,0,0), "cm"))
+p2_mod <- p2 + xlab('')+ ylab('')+ theme(plot.margin = unit(c(0,0,0,0), "cm"))
+p3_mod <- p3 +  ylab('Mean Daily Minimum\nTemperature (°C) (1990 - 2020)')+ theme(plot.margin = unit(c(0,0.5,0,0), "cm"))
+p4_mod <- p4 + ylab('')+ theme(plot.margin = unit(c(0,0,0,0), "cm"))
+
+(p1_mod + p2_mod) / (p3_mod + p4_mod) +
+  plot_layout(guides = 'collect') & 
+  plot_annotation(tag_levels = 'A') & 
+  theme(legend.position= 'bottom')
+
+ggsave('figures/paper/performance_sum_v2.jpeg', device = 'jpeg',
+       height = 15, width = 25, units = 'cm', dpi = 600)
+
+
+
+#eike wants to have the figure with x and y swapped
+p1 <- performance %>% 
+  filter(split == 'Validation') %>% 
+  mutate(species = factor(species, levels =c('Apple','Pear',  'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'),
+                          labels = c('Apple','Pear',  'Apricot', 'European\nPlum', 'Sweet\nCherry', 'Almond', 'Pistachio'))) %>% 
+  ggplot(aes(x = species, y = rmse)) +
+  #geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  geom_boxplot(show.legend = FALSE, fill = 'grey70')+
+  scale_x_discrete(limits = rev)+
+  xlab('') +
+  ylab('Root Mean Square\nError (RMSE)\nfor Validation Data') + 
+  scale_fill_manual(values = col2) +
+  #geom_vline(xintercept = 1, linetype = 'dashed') +
+  #  ggsci::scale_fill_tron()+
+  #  scale_fill_manual(values = viridis::viridis(8))+
+  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
+  theme_bw(base_size = 13)
+
+p2 <- performance %>% 
+  filter(split == 'Validation') %>% 
+  mutate(species = factor(species, levels = c('Apple','Pear',  'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'),
+                          labels = c('Apple','Pear',  'Apricot', 'European\nPlum', 'Sweet\nCherry', 'Almond', 'Pistachio'))) %>% 
+  ggplot(aes(x = species, y = rpiq_adj)) +
+  #geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  geom_boxplot(show.legend = FALSE, fill = 'grey70')+
+  scale_x_discrete(limits = rev)+
+  xlab('') +
+  ylab('Ratio of Performance to\nInterquartile Distance (RPIQ)\nfor Validation Data') + 
+  scale_fill_manual(values = col2) +
+  geom_hline(yintercept = 1, linetype = 'dashed') +
+  #  ggsci::scale_fill_tron()+
+  #  scale_fill_manual(values = viridis::viridis(8))+
+  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
+  theme_bw(base_size = 13)
+
+
+p3 <- performance %>% 
+  filter(split == 'Validation') %>% 
+  merge(master_adamedor, by = c('species', 'cultivar')) %>% 
+  mutate(species = factor(species, levels =c('Apple','Pear',  'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'),
+                          labels = c('Apple','Pear',  'Apricot', 'European\nPlum', 'Sweet\nCherry', 'Almond', 'Pistachio'))) %>% 
+  ggplot(aes(x = max_temp, y = rmse, group = max_temp)) +
+  #geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  geom_boxplot(show.legend = FALSE, fill = 'grey70')+
+  xlab('') +
+  ylab('Root Mean Square\nError (RMSE)\nfor Validation Data') + 
+  scale_x_continuous(breaks = c(5.8, 10.1, 10.8, 11.6, 13.2, 14.7))+ 
+  scale_fill_manual(values = col2) +
+  #geom_vline(xintercept = 1, linetype = 'dashed') +
+  #  ggsci::scale_fill_tron()+
+  #  scale_fill_manual(values = viridis::viridis(8))+
+  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
+  theme_bw(base_size = 13)
+
+p4 <- performance %>% 
+  filter(split == 'Validation') %>% 
+  merge(master_adamedor, by = c('species', 'cultivar')) %>% 
+  mutate(species = factor(species, levels =c('Apple','Pear',  'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio'),
+                          labels = c('Apple','Pear',  'Apricot', 'European\nPlum', 'Sweet\nCherry', 'Almond', 'Pistachio'))) %>% 
+  ggplot(aes(x = max_temp, y = rpiq_adj, group = max_temp)) +
+  #geom_boxplot(aes(fill = species), show.legend = FALSE)+
+  geom_boxplot(show.legend = FALSE, fill = 'grey70')+
+  ylab('') +
+  scale_x_continuous(breaks = c(5.8, 10.1, 10.8, 11.6, 13.2, 14.7))+ 
+  geom_hline(yintercept = 1, linetype = 'dashed') +
+  ylab('Ratio of Performance to\nInterquartile Distance (RPIQ)\nfor Validation Data') + 
+  scale_fill_manual(values = col2) +
+  #geom_vline(xintercept = 1, linetype = 'dashed') +
+  #  ggsci::scale_fill_tron()+
+  #  scale_fill_manual(values = viridis::viridis(8))+
+  #  scale_fill_brewer(type = 'discrete', palette = 'Pastel2')+
+  theme_bw(base_size = 13)
+
+p1_mod <- p1  + theme(plot.margin = unit(c(0,0.5,0,0), "cm"))
+p2_mod <- p2 + xlab('Modelled Species') + theme(plot.margin = unit(c(0,0.5,0,0), "cm"))
+p3_mod <- p3 + ylab('') +  theme(plot.margin = unit(c(0,0,0,0), "cm"))
+p4_mod <- p4 + ylab('') + xlab('Mean Daily Minimum\nTemperature (°C) (1990 - 2020)') + theme(plot.margin = unit(c(0,0,0,0), "cm"))
+
+(p1_mod + p3_mod) / (p2_mod + p4_mod) +
+  plot_layout(guides = 'collect') & 
+  plot_annotation(tag_levels = 'A') & 
+  theme(legend.position= 'bottom')
+
+ggsave('figures/paper/performance_sum_v3.jpeg', device = 'jpeg',
+       height = 15, width = 25, units = 'cm', dpi = 600)
+
+
+
+
+performance %>% 
+  filter(species == 'Apple', split == 'Validation') %>% 
+  group_by(species, cultivar) %>% 
+  summarise(med_rmse = median(rmse))
+
+performance %>% 
+  filter(species == 'Apple', split == 'Validation') %>% 
+  group_by(species) %>% 
+  summarise(med_rmse = median(rmse))
+
+performance %>% 
+  filter(species == 'Apricot', split == 'Validation') %>% 
+  group_by(species, cultivar) %>% 
+  summarise(med_rmse = median(rmse))
+
+performance %>% 
+  filter(split == 'Validation') %>% 
+  group_by(species, cultivar) %>% 
+  summarise(min_rmse = min(rmse),
+            med_rmse = median(rmse), 
+            max_rmse = max(rmse)) %>% 
+  mutate(range = max_rmse - min_rmse) %>% 
+  ungroup() %>%
+  group_by() %>% 
+  summarise(min(range),
+            median(range),
+            quantile(range, 0.1),
+            quantile(range, 0.9))
+  summarize(min(range))
+  ggplot(aes(y = species, x = range)) +
+  geom_boxplot()
+  summarise(med_rmse = median(rmse))
 
 
 #-------------------------------------------------------------#
@@ -334,7 +524,7 @@ enesmble_prediction_observed %>%
 #theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ggsave('figures/paper/ensemble_prediction_performance_changed_order.jpeg', height = 15, width = 25,
-       units = 'cm', device = 'jpeg')
+       units = 'cm', device = 'jpeg', dpi = 600)
 
 
 
@@ -344,6 +534,7 @@ ggsave('figures/paper/ensemble_prediction_performance_changed_order.jpeg', heigh
 #have individual figures for the cultivars
 enesmble_prediction_observed %>% 
   filter(species == 'Almond') %>% 
+  mutate(cultivar = recode(cultivar, `Abiodh Ras Djebel` = 'A.R. Djebel')) %>% 
   ggplot(aes(x = pheno, y = pred_ensemble)) +
   geom_point() +
   geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
@@ -364,7 +555,7 @@ enesmble_prediction_observed %>%
                      breaks = c(1, 32, 60,91), 
                      labels = c('Jan', 'Feb', 'Mar', 'Apr')) +
   theme_bw(base_size = 15) 
-ggsave('figures/paper/ensemble_prediction_performance_almond.jpeg', height = 15, width = 25,
+ggsave('figures/paper/ensemble_prediction_performance_almond.jpeg', height = 20, width = 25,
        units = 'cm', device = 'jpeg')
 
 enesmble_prediction_observed %>% 
@@ -440,7 +631,7 @@ enesmble_prediction_observed %>%
                      breaks = c(60,91, 121, 152), 
                      labels = c('Mar', 'Apr', 'May', 'Jun')) +
   theme_bw(base_size = 15) 
-ggsave('figures/paper/ensemble_prediction_performance_european-plum.jpeg', height = 15, width = 25,
+ggsave('figures/paper/ensemble_prediction_performance_european-plum.jpeg', height = 10, width = 15,
        units = 'cm', device = 'jpeg')
 
 # 
@@ -520,12 +711,14 @@ enesmble_prediction_observed %>%
                      breaks = c(60,91, 121, 152), 
                      labels = c('Mar', 'Apr', 'May', 'Jun')) +
   theme_bw(base_size = 15) 
-ggsave('figures/paper/ensemble_prediction_performance_pistachio.jpeg', height = 15, width = 25,
+ggsave('figures/paper/ensemble_prediction_performance_pistachio.jpeg', height = 10, width = 15,
        units = 'cm', device = 'jpeg')
 
 
 enesmble_prediction_observed %>% 
   filter(species == 'Sweet Cherry') %>% 
+  mutate(cultivar = recode(cultivar, `Blanca de Provenza` = 'Blanca de Prov.',
+                           `Early Van Compact` = 'Early V. Compact')) %>% 
   ggplot(aes(x = pheno, y = pred_ensemble)) +
   geom_point() +
   geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
@@ -546,7 +739,7 @@ enesmble_prediction_observed %>%
                      breaks = c(60,91, 121, 152), 
                      labels = c('Mar', 'Apr', 'May', 'Jun')) +
   theme_bw(base_size = 15) 
-ggsave('figures/paper/ensemble_prediction_performance_sweet-cherry.jpeg', height = 15, width = 25,
+ggsave('figures/paper/ensemble_prediction_performance_sweet-cherry.jpeg', height = 20, width = 25,
        units = 'cm', device = 'jpeg')
 
 
