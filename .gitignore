@@ -2,6 +2,9 @@
 .Rhistory
 .Rapp.history
 
+#code
+code/extracode/
+
 
 #figures
 figures/
@@ -10,7 +13,11 @@ figures/
 temp_cmip6/
 
 data/future_weather/
+data/future_weather-v2/
+data/hist-sim-weather/
+data/predictions_future_v2/
 
+writing/
 
 
 
