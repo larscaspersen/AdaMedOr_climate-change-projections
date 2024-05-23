@@ -2,7 +2,7 @@
 title: "Contrasting responses to climate change – predicting bloom of major temperate fruit tree species in the Mediterranean region and Central Europe"
 author: "Lars Caspersen"
 date: "2024-05-23"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
