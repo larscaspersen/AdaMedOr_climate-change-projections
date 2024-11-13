@@ -64,7 +64,9 @@ ggplot(data = world) +
   geom_label_repel(data = stations, aes(x = longitude, y = latitude, label = species),
                   nudge_x = c(-2, -3, -1.5, -1.5, -1.8, 1.5),
                   nudge_y = c(-0.70, -1.1, -0.70, -0.70, -0.70, -0.7), min.segment.length = 20, fill = "#FFFFFFAA", label.size = NA) +
-  coord_sf(xlim = c(-12, 12), ylim = c(28, 54), expand = FALSE) +
+  coord_sf(xlim = c(-12, 12), ylim = c(30, 52), expand = FALSE) +
+  #coord_sf(xlim = c(-12, 12), ylim = c(28, 54), expand = FALSE) +
+  #coord_sf(xlim = c(-14, 12), ylim = c(20, 54), expand = FALSE) +
   xlab('Longitude') +
   ylab('Latitude')+
   annotation_scale(location = "bl", width_hint = 0.4) +

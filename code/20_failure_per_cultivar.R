@@ -387,8 +387,8 @@ fail_plot_list$`Sweet Cherry`$labels$x <- fail_plot_list$`European Plum`$labels$
   fail_plot_list$Apple$labels$x <- fail_plot_list$Pear$labels$x <- fail_plot_list$Pistachio$labels$x <-
   fail_plot_list$Almond$labels$x <- " "
 
-jpeg(file="figures/paper/failure_cultivar-combined-v2.jpeg",
-     height = plot_height, width = plot_width, units = 'cm', res = 300)
+# jpeg(file="figures/paper/failure_cultivar-combined-v2.jpeg",
+#      height = plot_height, width = plot_width, units = 'cm', res = 300)
 
 fail_plot_list$`Sweet Cherry` + fail_plot_list$`European Plum` + fail_plot_list$Apricot +
   fail_plot_list$Apple + fail_plot_list$Pear + fail_plot_list$Pistachio + 
@@ -396,13 +396,13 @@ fail_plot_list$`Sweet Cherry` + fail_plot_list$`European Plum` + fail_plot_list$
 #draw the ylab manually
 grid::grid.draw(grid::textGrob(ylab, x = 0.01, rot = 90))
 grid::grid.draw(grid::textGrob(xlab, y = 0.1))
-dev.off()
+# dev.off()
 
 
 
-svg(file="figures/paper/failure_cultivar-combined-v2.svg",
-     height = plot_height * cm_to_inch,
-    width = plot_width * cm_to_inch)
+# svg(file="figures/paper/failure_cultivar-combined-v2.svg",
+#      height = plot_height * cm_to_inch,
+#     width = plot_width * cm_to_inch)
 
 fail_plot_list$`Sweet Cherry` + fail_plot_list$`European Plum` + fail_plot_list$Apricot +
   fail_plot_list$Apple + fail_plot_list$Pear + fail_plot_list$Pistachio + 
@@ -410,7 +410,7 @@ fail_plot_list$`Sweet Cherry` + fail_plot_list$`European Plum` + fail_plot_list$
 #draw the ylab manually
 grid::grid.draw(grid::textGrob(ylab, x = 0.01, rot = 90))
 grid::grid.draw(grid::textGrob(xlab, y = 0.1))
-dev.off()
+# dev.off()
 
 
 
@@ -551,8 +551,8 @@ shift_plot_list$`Sweet Cherry`$labels$x <- shift_plot_list$`European Plum`$label
   shift_plot_list$Apple$labels$x <- shift_plot_list$Pear$labels$x <- shift_plot_list$Pistachio$labels$x <-
   shift_plot_list$Almond$labels$x <- " "
 
-jpeg(file="figures/paper/shift_cultivar-combined-v2.jpeg",
-     height = plot_height, width = plot_width, units = 'cm', res = 300)
+# jpeg(file="figures/paper/shift_cultivar-combined-v2.jpeg",
+#      height = plot_height, width = plot_width, units = 'cm', res = 300)
 
 shift_plot_list$`Sweet Cherry` + shift_plot_list$`European Plum` + shift_plot_list$Apricot +
   shift_plot_list$Apple + shift_plot_list$Pear + shift_plot_list$Pistachio + 
@@ -560,12 +560,13 @@ shift_plot_list$`Sweet Cherry` + shift_plot_list$`European Plum` + shift_plot_li
 #draw the ylab manually
 grid::grid.draw(grid::textGrob(ylab, x = 0.01, rot = 90))
 grid::grid.draw(grid::textGrob(xlab, y = 0.1))
-dev.off()
+# dev.off()
 
 
-svg(file="figures/paper/shift_cultivar-combined-v2.svg",
-    height = plot_height * cm_to_inch,
-    width = plot_width * cm_to_inch)
+# svg(file="figures/paper/shift_cultivar-combined-v2.svg",
+#     height = plot_height * cm_to_inch,
+#     width = plot_width * cm_to_inch)
+library(patchwork)
 
 shift_plot_list$`Sweet Cherry` + shift_plot_list$`European Plum` + shift_plot_list$Apricot +
   shift_plot_list$Apple + shift_plot_list$Pear + shift_plot_list$Pistachio + 
@@ -573,7 +574,7 @@ shift_plot_list$`Sweet Cherry` + shift_plot_list$`European Plum` + shift_plot_li
 #draw the ylab manually
 grid::grid.draw(grid::textGrob(ylab, x = 0.01, rot = 90))
 grid::grid.draw(grid::textGrob(xlab, y = 0.1))
-dev.off()
+# dev.off()
 
 cross_out_df <- future_sub_fail %>% 
   filter(med_fail >= 0.5)
@@ -593,4 +594,18 @@ shift_stagnaation <- shift_df %>%
   filter(location %in% c('Meknes', 'Zaragoza')) %>% 
   group_by(species, scenario_year, ssp, location) %>% 
   summarize(median = median(med_shift))
+
+sub <- shift_df %>% 
+  filter(cultivar %in% c('Regina', 'Schneiders', 'Berlepsch'),
+         scenario_year == 2050)
+
+sub2 <- shift_df %>% 
+  filter(cultivar %in% c('Regina', 'Schneiders', 'Berlepsch') == FALSE,
+         species %in% c('Sweet Cherry', 'Apple'),
+         location == 'Klein-Altendorf',
+         scenario_year == 2050) %>% 
+  group_by(ssp) %>%
+  summarise(min = min(med_shift),
+            max = max(med_shift))
+
 

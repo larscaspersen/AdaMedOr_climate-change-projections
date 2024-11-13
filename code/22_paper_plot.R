@@ -492,8 +492,8 @@ enesmble_prediction_observed %>%
   theme_bw(base_size = 15) 
   #theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-ggsave('figures/paper/ensemble_prediction_performance.jpeg', height = 15, width = 25,
-       units = 'cm', device = 'jpeg')
+ggsave('figures/paper/figure_4.tiff', height = 15, width = 25,
+       units = 'cm', device = 'tiff', dpi = 500)
 
 performance_ensemble <- performance_ensemble %>% 
   mutate(species = factor(species, levels = c('Apple','Pear',  'Apricot', 'European Plum', 'Sweet Cherry', 'Almond', 'Pistachio')))
@@ -534,7 +534,8 @@ ggsave('figures/paper/ensemble_prediction_performance_changed_order.jpeg', heigh
 #have individual figures for the cultivars
 enesmble_prediction_observed %>% 
   filter(species == 'Almond') %>% 
-  mutate(cultivar = recode(cultivar, `Abiodh Ras Djebel` = 'A.R. Djebel')) %>% 
+  mutate(cultivar = recode(cultivar, `Abiodh Ras Djebel` = 'A.R. Djebel',
+                           `Fournat de Breznaud` = 'F. d. Breznaud')) %>% 
   ggplot(aes(x = pheno, y = pred_ensemble)) +
   geom_point() +
   geom_errorbar(aes(ymin = pred_ensemble - sd, ymax = pred_ensemble + sd)) +
@@ -555,7 +556,7 @@ enesmble_prediction_observed %>%
                      breaks = c(1, 32, 60,91), 
                      labels = c('Jan', 'Feb', 'Mar', 'Apr')) +
   theme_bw(base_size = 15) 
-ggsave('figures/paper/ensemble_prediction_performance_almond.jpeg', height = 20, width = 25,
+ggsave('figures/paper/ensemble_prediction_performance_almond.jpeg', height = 20, width = 27,
        units = 'cm', device = 'jpeg')
 
 enesmble_prediction_observed %>% 
@@ -2727,13 +2728,14 @@ ggplot2::ggsave('figures/paper/change_fail_2085_cult.jpeg', device = 'jpeg',
 # 
 # 
 # 
-# #make predictions for the actual weather data
-# cka <- read.csv('data/weather_ready/cka_clean.csv') %>% 
+#make predictions for the actual weather data
+# library(tidyverse)
+# cka <- read.csv('data/weather_ready/cka_clean.csv') %>%
 #   filter(Year < 2022)
 # cieza <- read.csv('data/weather_ready/cieza_clean_patched.csv')
 # sfax <- read.csv('data/weather_ready/sfax_clean.csv')
 # meknes <- read.csv('data/weather_ready/meknes_clean.csv')
-# zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv') %>% 
+# zaragoza <- read.csv('data/weather_ready/zaragoza_clean.csv') %>%
 #   filter(Year < 2022)
 # santomera <- read.csv('data/weather_ready/murcia_clean.csv')
 # 
@@ -2748,12 +2750,12 @@ ggplot2::ggsave('figures/paper/change_fail_2085_cult.jpeg', device = 'jpeg',
 # 
 # 
 # #numbers for table 1
-# # purrr::map(weather_list_pred, function(x){
-# #   x %>% 
-# #     filter(Year >= 1990, Year <= 2020) %>% 
-# #     summarise(mean_Tmin = mean(Tmin),
-# #               mean_Tmax = mean(Tmax))
-# # })
+# purrr::map(weather_list_pred, function(x){
+#   x %>%
+#     filter(Year >= 1990, Year <= 2020) %>%
+#     summarise(mean_Tmin = mean(Tmin),
+#               mean_Tmax = mean(Tmax))
+# })
 # 
 # 
 # 
