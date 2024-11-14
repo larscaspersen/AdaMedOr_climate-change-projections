@@ -2,6 +2,7 @@
 library(tidyverse)
 library(ggplot2)
 library(patchwork)
+#devtools::install_github('https://github.com/larscaspersen/addition_chillR')
 library(LarsChill)
 library(patchwork)
 
@@ -467,7 +468,7 @@ performance_ensemble <- enesmble_prediction_observed %>%
   group_by(species) %>% 
   summarise(RMSE = round(chillR::RMSEP(pred_ensemble, pheno, na.rm = TRUE),1),
             RPIQ = round(chillR::RPIQ(pred_ensemble, pheno, na.rm = TRUE),1),
-            mean_bias = round(mean(pheno - pred_ensemble, na.rm  = TRUE)), 1)
+            mean_bias = round(mean(pheno - pred_ensemble, na.rm  = TRUE),1), )
 
 enesmble_prediction_observed %>% 
   ggplot(aes(x = pheno, y = pred_ensemble)) +
