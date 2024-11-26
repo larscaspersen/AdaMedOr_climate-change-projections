@@ -164,7 +164,7 @@ p2 <- performance %>%
                                 Pistachio = 'Pi')) %>% 
   mutate(species_label = factor(species_label, levels = c('Almond', 'Apple', 'Apricot', 'EP', 'Pear', 'Pi', 'Sweet Cherry'))) %>% 
   filter(!(species %in% c('Almond', 'Apple', 'Apricot'))) %>% 
-  ggplot(aes(y = reorder(cultivar,  median_rpiq), fill = split, x = rpiq_adj)) +
+  ggplot(aes(y = reorder(cultivar,  median_rpiq), fill = split, x = rmse)) +
   geom_boxplot() +
   theme_bw() +
   #xlim(0, 21) +
