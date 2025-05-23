@@ -36,7 +36,7 @@ stations <- chillR::handle_gsod(action = 'download_weather',
 
 stations <- chillR::handle_gsod(stations)
 
-bassatine <- stations$BASSATINE$weather %>% 
+bassatine <- stations$BASSATINE %>% 
   dplyr::filter(Year >= 1973)
 #--> muss adrians script benutzen!
 #meknes data is a mess right now
@@ -64,7 +64,7 @@ source('code/utilities/daily_bias.R')
 
 bassatine$source_Tmax <- bassatine$source_Tmin <- NA
 
-for(i in 2:lenth(stations)){
+for(i in 2:length(stations)){
   
   #select a suitable start year
   if(as.numeric(substr(stations$BEGIN[i], start = 1,stop = 4)) < start_year){
@@ -85,18 +85,18 @@ for(i in 2:lenth(stations)){
                      location = stations$chillR_code[i], 
                      time_interval = c(download_start, download_end))
   
-  if(is.na(aux[[1]]$weather) == TRUE | is.character(aux[[1]]$weather) == TRUE){
+  if(length(aux[[1]]) == 0){
     next()
   }
   
   aux <- handle_gsod(aux)
-  aux <- aux[[1]]$weather
+  aux <- aux[[1]]
   
   #merge with bassatine
   
   weather_merged <- merge.data.frame(bassatine, 
                                      aux, 
-                                     by = c('DATE', 'Year', 'Month', 'Day'), 
+                                     by = c('Date', 'Year', 'Month', 'Day'), 
                                      all.x = TRUE, suffixes = c('', '.aux'))
   
   overlap <- weather_merged %>% 
@@ -107,12 +107,12 @@ for(i in 2:lenth(stations)){
     next()
   }
   
-  weather_merged$JDay <- lubridate::yday(weather_merged$DATE)
+  weather_merged$JDay <- lubridate::yday(weather_merged$Date)
   
   bias_df <- get_daily_bias_df(weather_merged, window_width = 15)
   
   weather_merged <- merge.data.frame(weather_merged, bias_df, by = 'JDay', all.x = TRUE) %>% 
-    arrange(DATE)
+    arrange(Date)
     
   #plot(weather_merged$Tmin - weather_merged$Tmin.aux)
   
@@ -140,18 +140,18 @@ for(i in 2:lenth(stations)){
   
   #add information which station lead to the gap filling
   weather_merged$source_Tmin <-  ifelse(is.na(Tmin_filled) == FALSE & is.na(weather_merged$Tmin) == TRUE,
-                                        yes = aux_station$chillR_code[j],
+                                        yes = stations$chillR_code[i],
                                         no = weather_merged$source_Tmin)
   
   weather_merged$source_Tmax <-  ifelse(is.na(Tmax_filled) == FALSE & is.na(weather_merged$Tmax) == TRUE,
-                                        yes = aux_station$chillR_code[j],
+                                        yes = stations$chillR_code[i],
                                         no = weather_merged$source_Tmax)
   
   weather_merged$Tmin <- Tmin_filled
   weather_merged$Tmax <- Tmax_filled
   
   #save the gap filled weather station
-  bassatine <- weather_merged[,c('DATE', 'Year', 'Month', 'Day', 'Tmin', 'Tmax', 'Tmean', 'Prec', 'source_Tmin', 'source_Tmax')]
+  bassatine <- weather_merged[,c('Date', 'Year', 'Month', 'Day', 'Tmin', 'Tmax', 'Tmean', 'Prec', 'source_Tmin', 'source_Tmax')]
   
   if(sum(is.na(bassatine$Tmin)) == 0 & sum(is.na(bassatine$Tmin)) == 0){
     break()
@@ -248,18 +248,18 @@ stations <- stations %>%
 loc <- stations %>% 
   filter(station_name == 'Cieza') %>% 
   dplyr::select(Latitude, Longitude)
+loc <- unlist(loc)
 
-possible_stations <- handle_gsod(action = 'list_stations', location = loc)
+possible_stations <- handle_gsod(action = 'list_stations', location = loc[c(2,1)])
 
 #download murcia station
 murcia <- handle_gsod(action = 'download_weather', 
                       location =  possible_stations$chillR_code[1], 
-                      time_interval = c(1973, 2022),
-                      station_list = possible_stations)
+                      time_interval = c(1973, 2022))
 
 murcia <- handle_gsod(murcia)
 
-cieza_patched <- patch_daily_temperatures(cieza,murcia$MURCIA$weather)
+cieza_patched <- patch_daily_temperatures(cieza,murcia$MURCIA)
 
 
 write.csv(cieza_patched$weather, file = 'data/weather_ready/cieza_clean_patched.csv', row.names = FALSE)
@@ -284,7 +284,7 @@ unique(adamedor$location)
 coord_santomera<- c(-1.05, 38.06)
 
 stations <- handle_gsod_new(action = 'list_stations', time_interval = c(1990, 2020), 
-                            ocation = coord_santomera)
+                            location = coord_santomera)
 
 
 # stat_spatial <- SpatialPointsDataFrame(data.frame(stations$Long, stations$Lat), stations, 
